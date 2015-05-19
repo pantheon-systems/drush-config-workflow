@@ -5,6 +5,7 @@ HAS_KDIFF3="$(which kdiff3)"
 HAS_PHP="$(which php)"
 HAS_COMPOSER="$(which composer)"
 HAS_DRUSH="$(which drush)"
+HAS_TERMINUS="$(which terminus)"
 
 # Keep track of state
 MODIFIED_BASHRC=false
@@ -127,8 +128,8 @@ fi
 if [ -n "$HAS_DRUSH" ]
 then
   DRUSH_VERSION="$(drush version --pipe)"
-  TEST_VERSION="$(echo $DRUSH_VERSON | grep '^8')"
-  if [ -z "$TEST_VERSION" ]
+  echo $DRUSH_VERSION | grep '^8' > /dev/null
+  if [ "$?" == "1" ]
   then
     echo "Please upgrade to Drush 8 before running this script." >&2
     exit 1
@@ -138,6 +139,20 @@ else
 
   # Install Drush via composer
   composer global require drush/drush:dev-master --prefer-source
+fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  G E T   T E R M I N U S
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if [ -z "$HAS_TERMINUS" ]
+then
+  echo "# Installing Terminus"
+
+  curl https://github.com/pantheon-systems/cli/releases/download/0.5.5/terminus.phar -L -o $HOME/bin/terminus
+  chmod +x $HOME/terminus
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

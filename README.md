@@ -21,6 +21,7 @@ See the sections below for details.
 ## Requirements
 * A config-merge tool, e.g. `kdiff3`, must be installed
 * Drush 7.0.0-rc2 (only), or Drush 8.x-dev
+* Pantheon Terminus CLI (Optional -- only needed if using a Pantheon remote)
 * Drupal 8.0-beta10 or later
 * A local Drupal "dev" site, and a local or remote "staging" site
 
@@ -32,6 +33,10 @@ See the sections below for details.
 
 ### Installing Drush 7 or 8
 Follow the [installation instructions in the Drush documentation](http://docs.drush.org/en/master/install/) to install Drush 7.  Most users should be able to upgrade from Drush 5 or Drush 6 to version 7 without encountering any issues.  At the time of this writing, Drush 7.0.0-rc2 is recommended.  However, once Drush 8.0-alpha1 is released, this version should be used with Drupal 8, as at the moment, only this version of Drupal is supported by the config-merge command.  A Drupal 7 version may be provided in the future.
+
+### Installing Terminus CLA
+
+Follow the [terminus installation instructions](https://github.com/pantheon-systems/cli/wiki/Installation).
 
 ### Installing Drupal 8
 If you already have a remote Drupal 8 testing site, then you may use it to try out 
