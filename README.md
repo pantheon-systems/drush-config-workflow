@@ -9,7 +9,16 @@ confirmation message listing the sections changed is presented.  If configuratio
 _are_ in conflict, then a three-way merge tool will be launched, allowing for the conflicts
 to be reconciled by hand in the configuration YAML files.
 
-## Prerequisites
+## Quickstart
+
+To quickly create two local sites for `config-merge` testing, run:
+
+./scripts/quickstart
+
+This will install the requirements and set up an alias file for testing.
+See the sections below for details.
+
+## Requirements
 * A config-merge tool, e.g. `kdiff3`, must be installed
 * Drush 7.0.0-rc2 (only), or Drush 8.x-dev
 * Drupal 8.0-beta10 or later
