@@ -1,0 +1,157 @@
+#!/bin/bash
+
+# Note whether we have needed apps
+HAS_KDIFF3="$(which kdiff3)"
+HAS_PHP="$(which php)"
+HAS_COMPOSER="$(which composer)"
+HAS_DRUSH="$(which drush)"
+
+# Keep track of state
+MODIFIED_BASHRC=false
+
+# Prohibit execution as root user
+if [ "$(whoami)" == "root" ]
+then
+  echo "Do not run $0 as root." >&2
+  exit 1
+fi
+
+# Exit if php is not installed
+if [ -z "$HAS_PHP" ]
+then
+  echo "Install php before running this script." >&2
+fi
+
+# Create an initial bashrc if one does not already exist.
+if [ ! -f "$HOME/.bashrc" ] ; then
+  echo "# Initial .bashrc created by $0." > "$HOME/.bashrc"
+fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  O . S .  -  S P E C I F I C
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Check the OS
+OS="$(uname -s)"
+
+# Do OS-specific operations.
+case "$OS" in
+  Darwin)
+    if [ -z "$HAS_KDIFF3" ]
+    then
+      brew install Caskroom/cask/kdiff3
+    fi
+    ;;
+
+  Linux)
+    if [ -z "$HAS_KDIFF3" ]
+    then
+      echo "$0 would like to install kdiff3"
+      sudo apt-get install kdiff3
+    fi
+    ;;
+
+  *)
+    echo "$OS is not supported by $0" >&2
+    exit 1
+    ;;
+esac
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  G E T   C O M P O S E R
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# https://getcomposer.org/doc/00-intro.md#system-requirements
+
+if [ -z "$HAS_COMPOSER" ]
+then
+  # Download composer and place it in $HOME/bin
+  curl -sS https://getcomposer.org/installer | php
+  mkdir -p "$HOME/bin"
+  mv composer.phar "$HOME/bin/composer"
+
+  # If $HOME/bin is not already in the user's $PATH, then add it to ~/.bashrc
+  if [ -z "$(which composer)" ] ; then
+    sed -i '1i export PATH=$PATH:$HOME/bin' ~/.bashrc
+    export PATH="$PATH:$HOME/bin"
+    MODIFIED_BASHRC=true
+  fi
+fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  S E T   P A T H   V A R I A B L E S
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Make sure that $HOME/bin is on our PATH
+
+if [ "$PATH" == "${PATH/$HOME/}" ] ; then
+  export PATH="$HOME/bin:$PATH"
+fi
+
+# Insure that the vendor/bin directory is on our PATH as well
+
+if [ "$PATH" == "${PATH/.composer/}" ] ; then
+  export PATH="$HOME/.composer/vendor/bin:$PATH"
+fi
+
+# Add $HOME/bin and $HOME/.composer/vendor/bin permanently to our $PATH
+# in our .bashrc
+chkbashrc="$(grep 'composer/vendor/bin' "$HOME/.bashrc")"
+if [ "X$chkbashrc" = "X" ] ; then
+  sed -e '/^ *$/,$ d' "$HOME/.bashrc" > "$HOME/.bashrc-head"
+  sed -e '1,/^ *$/ d' "$HOME/.bashrc" > "$HOME/.bashrc-body"
+  cp "$HOME/.bashrc-head" "$HOME/.bashrc"
+cat <<- __END__ >> "$HOME/.bashrc"
+[ "\$PATH" == "\${PATH/\$HOME/}" ] && export PATH="\$HOME/bin:\$PATH"
+[ "\$PATH" == "\${PATH/.composer/}" ] && export PATH="\$HOME/.composer/vendor/bin:\$PATH"
+__END__
+  cat "$HOME/.bashrc-body" >> "$HOME/.bashrc"
+  rm "$HOME/.bashrc-head"
+  rm "$HOME/.bashrc-body"
+  MODIFIED_BASHRC=true
+fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  G E T   D R U S H
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if [ -n "$HAS_DRUSH" ]
+then
+  DRUSH_VERSION="$(drush version --pipe)"
+  TEST_VERSION="$(echo $DRUSH_VERSON | grep '^8')"
+  if [ -z "$TEST_VERSION" ]
+  then
+    echo "Please upgrade to Drush 8 before running this script." >&2
+    exit 1
+  fi
+else
+  echo "# Installing Drush"
+
+  # Install Drush via composer
+  composer global require drush/drush:dev-master --prefer-source
+fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  F I N I S H   U P
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if $MODIFIED_BASHRC
+then
+  echo "#"
+  echo "# IMPORTANT: To use the components installed by this script,"
+  echo "#            type `source ~/.bashrc`"
+  echo "#"
+  echo "# Repeat in every open terminal."
+  echo "#"
+fi
