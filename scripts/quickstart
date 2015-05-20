@@ -1,14 +1,66 @@
 #!/bin/bash
 
+#
+# Usage:
+#
+#   ./scripts/quickstart [pantheon-site-name]
+#
+# Purpose:
+#
+#   This script wil install all of the components needed to use
+#   the `drush config-merge` command.  It will also create two
+#   local Drupal 8 sites to experiment with.
+#
+#   If the name of a Pantheon site is provided as a commandline
+#   argument, then only one local site will be created, and it
+#   will be a clone of the remote Pantheon site.
+#
+# Notes:
+#
+#   This script is idempotent; you may run it multiple times with
+#   no ill effects.  No action will be taken for components that
+#   you have already installed before running this script.
+#
+
+# Default argument values
+PANTHEON_SITE=
+
+# Default option values
+DEBUG=false
+
+# Initial state variables
+MODIFIED_BASHRC=false
+
+#
+# Parse command line args
+#
+while [ $# -gt 0 ] ; do
+
+  option="$1"
+  shift
+
+  case "$option" in
+    -d|--debug)
+      DEBUG=true
+      ;;
+
+    *)
+      if [ -z "$PANTHEON_SITE" ] ; then
+        PANTHEON_SITE="$option"
+      else
+        echo "Too many arguments" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
 # Note whether we have needed apps
 HAS_KDIFF3="$(which kdiff3)"
 HAS_PHP="$(which php)"
 HAS_COMPOSER="$(which composer)"
 HAS_DRUSH="$(which drush)"
 HAS_TERMINUS="$(which terminus)"
-
-# Keep track of state
-MODIFIED_BASHRC=false
 
 # Prohibit execution as root user
 if [ "$(whoami)" == "root" ]
@@ -43,6 +95,8 @@ case "$OS" in
     if [ -z "$HAS_KDIFF3" ]
     then
       brew install Caskroom/cask/kdiff3
+    else
+      echo "kdiff3 already installed."
     fi
     ;;
 
@@ -51,6 +105,8 @@ case "$OS" in
     then
       echo "$0 would like to install kdiff3"
       sudo apt-get install kdiff3
+    else
+      echo "kdiff3 already installed."
     fi
     ;;
 
@@ -82,6 +138,8 @@ then
     export PATH="$PATH:$HOME/bin"
     MODIFIED_BASHRC=true
   fi
+else
+  echo "Composer already installed."
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -133,6 +191,8 @@ then
   then
     echo "Please upgrade to Drush 8 before running this script." >&2
     exit 1
+  else
+    echo "Drush 8 already installed."
   fi
 else
   echo "# Installing Drush"
@@ -152,8 +212,26 @@ then
   echo "# Installing Terminus"
 
   curl https://github.com/pantheon-systems/cli/releases/download/0.5.5/terminus.phar -L -o $HOME/bin/terminus
-  chmod +x $HOME/terminus
+  chmod +x $HOME/bin/terminus
+else
+  echo "Terminus already installed."
 fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  S E T   U P   F I R S T   D R U P A L   S I T E
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+echo "Local Drupal site creation tbd."
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  C L O N E   A   " W O R K I N G "   D R U P A L   S I T E
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+echo "Drupal site cloning tbd."
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
