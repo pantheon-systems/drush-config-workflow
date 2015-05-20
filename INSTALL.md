@@ -58,6 +58,8 @@ $ terminus sites aliases
 ```
 This will create the file ~/.drush/pantheon.aliases.drushrc.php; you can override this with the --location option, though.
 
+n.b. You will need to log in via `terminus auth login` first.
+
 2. Make an alias for your local site.
 
 Create a file ~/.drush/local.aliases.drushrc.php, and add the following entry:
