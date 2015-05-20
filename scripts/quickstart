@@ -3,7 +3,7 @@
 #
 # Usage:
 #
-#   ./scripts/quickstart [pantheon-site-name]
+#   ./scripts/quickstart [pantheon-site-name] [install-path]
 #
 # Purpose:
 #
@@ -21,15 +21,28 @@
 #   no ill effects.  No action will be taken for components that
 #   you have already installed before running this script.
 #
+#   Use --revert to erase the "working" site, and make it once again
+#   a fresh copy of the dev site.
+#
 
 # Default argument values
 PANTHEON_SITE=
+BASE_DIR=
+PORT=8778
 
 # Default option values
 DEBUG=false
+TRACE=false
+MYSQL_USER=root
+MYSQL_PASSWORD=
 
 # Initial state variables
+COPY_DATABASE=false
+IMPORT_CONFIGURATION=false
 MODIFIED_BASHRC=false
+DEBUGMSG=test
+MSG='echo # '
+ERROR='echo '
 
 #
 # Parse command line args
@@ -42,13 +55,41 @@ while [ $# -gt 0 ] ; do
   case "$option" in
     -d|--debug)
       DEBUG=true
+      DEBUGMSG='echo ### '
+      ;;
+
+    --trace)
+      TRACE=true
+      ;;
+
+    --user)
+      MYSQL_USER=$1
+      shift
+      ;;
+
+    --pw)
+      MYSQL_PASSWORD=$1
+      shift
+      ;;
+
+    --port)
+      PORT=8778
+      ;;
+
+    --revert)
+      COPY_DATABASE=true
+      IMPORT_CONFIGURATION=true
       ;;
 
     *)
-      if [ -z "$PANTHEON_SITE" ] ; then
+      if [ -z "$PANTHEON_SITE" ]
+      then
         PANTHEON_SITE="$option"
+      elseif [ -z "$BASE_DIR" ]
+      then
+        BASE_DIR="$option"
       else
-        echo "Too many arguments" >&2
+        $ERROR "Too many arguments" >&2
         exit 1
       fi
       ;;
@@ -65,19 +106,31 @@ HAS_TERMINUS="$(which terminus)"
 # Prohibit execution as root user
 if [ "$(whoami)" == "root" ]
 then
-  echo "Do not run $0 as root." >&2
+  $ERROR "Do not run $0 as root." >&2
   exit 1
 fi
 
 # Exit if php is not installed
 if [ -z "$HAS_PHP" ]
 then
-  echo "Install php before running this script." >&2
+  $ERROR "Install php before running this script." >&2
 fi
 
 # Create an initial bashrc if one does not already exist.
 if [ ! -f "$HOME/.bashrc" ] ; then
   echo "# Initial .bashrc created by $0." > "$HOME/.bashrc"
+fi
+
+# Set a default BASE_DIR if one was not provided
+if [ -z "$BASE_DIR" ]
+then
+  BASE_DIR="$HOME/local/drupal"
+fi
+
+# Turn on bash debugging if --trace is specified
+if $TRACE
+then
+  set -x
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -96,7 +149,7 @@ case "$OS" in
     then
       brew install Caskroom/cask/kdiff3
     else
-      echo "kdiff3 already installed."
+      $DEBUGMSG "kdiff3 already installed."
     fi
     ;;
 
@@ -106,12 +159,12 @@ case "$OS" in
       echo "$0 would like to install kdiff3"
       sudo apt-get install kdiff3
     else
-      echo "kdiff3 already installed."
+      $DEBUGMSG "kdiff3 already installed."
     fi
     ;;
 
   *)
-    echo "$OS is not supported by $0" >&2
+    $ERROR "$OS is not supported by $0" >&2
     exit 1
     ;;
 esac
@@ -139,7 +192,7 @@ then
     MODIFIED_BASHRC=true
   fi
 else
-  echo "Composer already installed."
+  $DEBUGMSG "Composer already installed."
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -189,13 +242,13 @@ then
   echo $DRUSH_VERSION | grep '^8' > /dev/null
   if [ "$?" == "1" ]
   then
-    echo "Please upgrade to Drush 8 before running this script." >&2
+    $ERROR "Please upgrade to Drush 8 before running this script." >&2
     exit 1
   else
-    echo "Drush 8 already installed."
+    $DEBUGMSG "Drush 8 already installed."
   fi
 else
-  echo "# Installing Drush"
+  $MSG "Installing Drush"
 
   # Install Drush via composer
   composer global require drush/drush:dev-master --prefer-source
@@ -209,12 +262,12 @@ fi
 
 if [ -z "$HAS_TERMINUS" ]
 then
-  echo "# Installing Terminus"
+  $MSG "Installing Terminus"
 
   curl https://github.com/pantheon-systems/cli/releases/download/0.5.5/terminus.phar -L -o $HOME/bin/terminus
   chmod +x $HOME/bin/terminus
 else
-  echo "Terminus already installed."
+  $DEBUGMSG "Terminus already installed."
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -223,7 +276,17 @@ fi
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-echo "Local Drupal site creation tbd."
+#
+# Local site creation.
+#
+# If a Pantheon site was specified, then there is nothing to do here.
+#
+if [ -z "PANTHEON_SITE" ]
+then
+
+  $DEBUGMSG "Local Drupal site creation tbd."
+
+fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
@@ -231,7 +294,153 @@ echo "Local Drupal site creation tbd."
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-echo "Drupal site cloning tbd."
+#
+# Pantheon case:
+#
+# Clone from Pantheon to local.
+#
+if [ -n "$PANTHEON_SITE" ]
+then
+
+  # Record some basic information
+  UUID=$(terminus site info --site=$pantheon_site --field=id)
+  $DEBUGMS "UUID is $UUID"
+
+  REPO="ssh://codeserver.dev.$UUID@codeserver.dev.$UUID.drush.in:2222/~/repository.git"
+  $DEBUGMS "Repository is $REPO"
+
+  HASH_SALT="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1)"
+  $DEBUGMS "Hash_salt is $HASH_SALT"
+
+  LOCAL_ROOT="$BASE_DIR/$PANTHEON_SITE"
+  $DEBUGMSG "Local root is $LOCAL_ROOT"
+
+  LOCAL_SITE_ALIAS="@local.$PANTHEON_SITE"
+  $DEBUGMSG "Local site alias is $LOCAL_SITE_ALIAS"
+
+  PANTHEON_SITE_ALIAS="@pantheon.$PANTHEON_SITE.dev"
+  $DEBUGMSG "Pantheon site alias is $PANTHEON_SITE_ALIAS"
+
+  #
+  # Create a local copy of the Pantheon site.
+  #
+  # The numbers in the comments below correspond to the
+  # steps in the manual install instructions in INSTALL.md
+  #
+
+  # 1. Make sure that your Pantheon Aliases are up-to-date:
+
+  terminus sites aliases
+
+  # 2. Make an alias for your local site.
+
+  # Make a site alias for the local site
+  LOCAL_ALIAS_FILE="$HOME/.drush/local.aliases.drushrc.php"
+  if [ ! -f  "$LOCAL_ALIAS_FILE" ]
+  then
+    echo "<?php" > "$LOCAL_ALIAS_FILE"
+  fi
+
+  cat << __EOF__ > "$LOCAL_ALIAS_FILE"
+
+\$aliases["$PANTHEON_SITE"] = array(
+  'root' => '$LOCAL_ROOT',
+  'uri' => 'localhost:$PORT',
+);
+__EOF__
+
+  # 3. Check out the code for the Pantheon site.
+
+  # If the site was already cloned, just update it.
+  if [ -d "$LOCAL_ROOT" ]
+  then
+    cd "$LOCAL_ROOT"
+    git pull origin master
+  else
+    # Make sure that the parent directory of $LOCAL_ROOT exists
+    mkdir -p "$(dirname $LOCAL_ROOT)"
+    cd "$(dirname $LOCAL_ROOT)"
+    git clone "$REPO" $(basename $LOCAL_ROOT)
+    cd "$LOCAL_ROOT"
+  fi
+
+  # 4. Set up your .gitignore file
+
+  if [ ! -f "$LOCAL_ROOT/.gitignore" ]
+  then
+    cp "$LOCAL_ROOT/example.gitignore" "$LOCAL_ROOT/.gitignore"
+    git add "$LOCAL_ROOT/.gitignore"
+    git commit -m "Create .gitignore file."
+  fi
+
+  # 5. Configure your settings.php file
+
+  grep -q local.settings.php sites/default/settings.php
+  if [ "$?" == "1" ] ; then
+    echo 'if (file_exists(__DIR__ . "/settings.local.php")) { include __DIR__ . "/settings.local.php"; }' >> sites/default/settings.php
+    git add sites/default/settings.php
+    git commit -m "Add an include local settings line in settings.php"
+    git push
+  fi
+
+  # 6. Define local configuration values in your settings.local.php file
+
+  if [ ! -f "sites/default/settings.local.php" ]
+  then
+
+cat << __EOF__ > sites/default/settings.local.php
+<?php
+
+\$config['system.site']['name'] = 'Local $PANTHEON_SITE site';
+
+\$settings['hash_salt'] = '$HASH_SALT';
+
+\$databases['default']['default'] = array (
+  'database' => 'pcmlocald8mysqldb',
+  'username' => '$MYSQL_USER',
+  'password' => '$MYSQL_PASSWORD',
+  'prefix' => '',
+  'host' => 'localhost',
+  'port' => '',
+  'namespace' => 'Drupal\\Core\\Database\\Driver\\mysql',
+  'driver' => 'mysql',
+);
+
+\$config_directories = array(
+  CONFIG_ACTIVE_DIRECTORY => 'sites/default/files/config/active',
+  CONFIG_STAGING_DIRECTORY => 'sites/default/config',
+);
+__EOF__
+
+    # Create the local database at the same time that we
+    # set up the settings.php file.
+    drush @local.pantheon-site-name sql-create
+    COPY_DATABASE=true
+
+  fi
+
+  # 7. Copy the database from Pantheon to the local site
+
+  if $COPY_DATABASE
+  then
+    drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS
+  fi
+
+  # In the case of a --revert, import the configuration again.
+
+  if $IMPORT_CONFIGURATION
+  then
+    drush $LOCAL_SITE_ALIAS config-import
+  fi
+
+#
+# Non-Pantheon (local-to-local) case:
+#
+# Clone the site created above to another local site.
+#
+else
+  $DEBUGMSG "Local Drupal site clone tbd."
+fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
