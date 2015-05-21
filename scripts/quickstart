@@ -27,12 +27,14 @@
 
 # Default argument values
 PANTHEON_SITE=
+PANTHEON_ENV='dev'
 BASE_DIR=
 PORT=8778
 
 # Default option values
 DEBUG=false
 TRACE=false
+FORCE=false
 MYSQL_USER=root
 MYSQL_PASSWORD=
 
@@ -62,6 +64,10 @@ while [ $# -gt 0 ] ; do
       TRACE=true
       ;;
 
+    --force)
+      FORCE=true
+      ;;
+
     --user)
       MYSQL_USER=$1
       shift
@@ -81,11 +87,21 @@ while [ $# -gt 0 ] ; do
       IMPORT_CONFIGURATION=true
       ;;
 
+    --env)
+      PANTHEON_ENV="$1"
+      shift
+      ;;
+
+    -*)
+      $ERROR "Unknown option $option" >&2
+      exit 1
+      ;;
+
     *)
       if [ -z "$PANTHEON_SITE" ]
       then
         PANTHEON_SITE="$option"
-      elseif [ -z "$BASE_DIR" ]
+      elif [ -z "$BASE_DIR" ]
       then
         BASE_DIR="$option"
       else
@@ -240,7 +256,7 @@ if [ -n "$HAS_DRUSH" ]
 then
   DRUSH_VERSION="$(drush version --pipe)"
   echo $DRUSH_VERSION | grep '^8' > /dev/null
-  if [ "$?" == "1" ]
+  if [ "$?" != "0" ]
   then
     $ERROR "Please upgrade to Drush 8 before running this script." >&2
     exit 1
@@ -290,6 +306,33 @@ fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
+#  C H E C K   E N V I R O N M E N T
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Check to see if the Mysql user and password are correct.
+
+MYSQL_EXTRA_FILE="$HOME/.mysql/mysqlextra"
+mkdir -p $(dirname $MYSQL_EXTRA_FILE)
+
+cat << __EOT__ > "$MYSQL_EXTRA_FILE"
+#This file was written by the quickstart script
+[client]
+user="$MYSQL_USER"
+password="$MYSQL_PASSWORD"
+__EOT__
+chmod 700 "$MYSQL_EXTRA_FILE"
+
+mysql --defaults-extra-file="$MYSQL_EXTRA_FILE" -e 'select 1;' > /dev/null 2>&1
+if [ "$?" != "0" ] ; then
+  $ERROR "Mysql credentials incorrect.  Please run again with --user and --pw." >&2
+  exit 1
+fi
+
+$DEBUGMSG "Mysql credentials are okay."
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
 #  C L O N E   A   " W O R K I N G "   D R U P A L   S I T E
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -301,16 +344,47 @@ fi
 #
 if [ -n "$PANTHEON_SITE" ]
 then
+  $DEBUGMSG "Pantheon site is $PANTHEON_SITE"
+
+  # Insure that we are logged in
+  WHOAMI=$(terminus auth whoami)
+  if [ "$WHOAMI" == "You are not logged in." ]
+  then
+    $ERROR "Please login first with `terminus auth login`" >&2
+    exit 1
+  fi
+
+  # Check our connection mode
+  CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV")
+  $DEBUGMSG "$CONNECTION_MODE"
+  echo "$CONNECTION_MODE" | grep -qi git
+  if [ "$?" != "0" ]
+  then
+    if $FORCE
+    then
+      terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV" --set=git
+      CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV")
+    else
+      $ERROR "The site $PANTHEON_SITE is not in 'git' mode.  Fix this via 'terminus site connection-mode --site=\"$PANTHEON_SITE\" --env=\"$PANTHEON_ENV\" --set=git', or run again with --force to force-switch to 'git' mode." >&2
+      exit 1
+    fi
+  fi
+  $DEBUGMSG "$CONNECTION_MODE"
 
   # Record some basic information
-  UUID=$(terminus site info --site=$pantheon_site --field=id)
-  $DEBUGMS "UUID is $UUID"
+  UUID=$(terminus site info --site="$PANTHEON_SITE" --field=id)
+  if [ "$?" != "0" ]
+  then
+    $ERROR "Could not determine UUID for $PANTHEON_SITE" >&2
+    exit 1
+  fi
+  $DEBUGMSG "UUID is $UUID"
 
   REPO="ssh://codeserver.dev.$UUID@codeserver.dev.$UUID.drush.in:2222/~/repository.git"
-  $DEBUGMS "Repository is $REPO"
+  $DEBUGMSG "Repository is $REPO"
 
   HASH_SALT="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1)"
-  $DEBUGMS "Hash_salt is $HASH_SALT"
+  $DEBUGMSG "Hash_salt is $HASH_SALT"
 
   LOCAL_ROOT="$BASE_DIR/$PANTHEON_SITE"
   $DEBUGMSG "Local root is $LOCAL_ROOT"
@@ -335,13 +409,14 @@ then
   # 2. Make an alias for your local site.
 
   # Make a site alias for the local site
+  mkdir -p "$HOME/.drush"
   LOCAL_ALIAS_FILE="$HOME/.drush/local.aliases.drushrc.php"
   if [ ! -f  "$LOCAL_ALIAS_FILE" ]
   then
     echo "<?php" > "$LOCAL_ALIAS_FILE"
   fi
 
-  cat << __EOF__ > "$LOCAL_ALIAS_FILE"
+  cat << __EOF__ >> "$LOCAL_ALIAS_FILE"
 
 \$aliases["$PANTHEON_SITE"] = array(
   'root' => '$LOCAL_ROOT',
@@ -354,9 +429,11 @@ __EOF__
   # If the site was already cloned, just update it.
   if [ -d "$LOCAL_ROOT" ]
   then
+    $DEBUGMSG "Update code from git repository"
     cd "$LOCAL_ROOT"
     git pull origin master
   else
+    $DEBUGMSG "Clone git repository"
     # Make sure that the parent directory of $LOCAL_ROOT exists
     mkdir -p "$(dirname $LOCAL_ROOT)"
     cd "$(dirname $LOCAL_ROOT)"
@@ -368,6 +445,7 @@ __EOF__
 
   if [ ! -f "$LOCAL_ROOT/.gitignore" ]
   then
+    $DEBUGMSG "Set up .gitignore file"
     cp "$LOCAL_ROOT/example.gitignore" "$LOCAL_ROOT/.gitignore"
     git add "$LOCAL_ROOT/.gitignore"
     git commit -m "Create .gitignore file."
@@ -375,8 +453,9 @@ __EOF__
 
   # 5. Configure your settings.php file
 
-  grep -q local.settings.php sites/default/settings.php
-  if [ "$?" == "1" ] ; then
+  grep -q settings.local.php "$LOCAL_ROOT/sites/default/settings.php"
+  if [ "$?" != "0" ] ; then
+    $DEBUGMSG "Include settings.local.php from settings.php"
     echo 'if (file_exists(__DIR__ . "/settings.local.php")) { include __DIR__ . "/settings.local.php"; }' >> sites/default/settings.php
     git add sites/default/settings.php
     git commit -m "Add an include local settings line in settings.php"
@@ -388,6 +467,8 @@ __EOF__
   if [ ! -f "sites/default/settings.local.php" ]
   then
 
+  $DEBUGMSG "Create settings.local.php"
+
 cat << __EOF__ > sites/default/settings.local.php
 <?php
 
@@ -396,7 +477,7 @@ cat << __EOF__ > sites/default/settings.local.php
 \$settings['hash_salt'] = '$HASH_SALT';
 
 \$databases['default']['default'] = array (
-  'database' => 'pcmlocald8mysqldb',
+  'database' => '${PANTHEON_SITE}localdb',
   'username' => '$MYSQL_USER',
   'password' => '$MYSQL_PASSWORD',
   'prefix' => '',
@@ -414,7 +495,7 @@ __EOF__
 
     # Create the local database at the same time that we
     # set up the settings.php file.
-    drush @local.pantheon-site-name sql-create
+    drush $PANTHEON_SITE_ALIAS sql-create
     COPY_DATABASE=true
 
   fi
@@ -423,13 +504,30 @@ __EOF__
 
   if $COPY_DATABASE
   then
+    $DEBUGMSG "sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS"
     drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS
   fi
 
-  # In the case of a --revert, import the configuration again.
+  # If we have never used the configuration tools before, then
+  # our configuration staging directory will be empty.  In that
+  # instance, we should export the current configuration and commit it.
+  if [ ! -f "$LOCAL_ROOT/sites/default/config/system.site.yml" ]
+  then
+    $DEBUGMSG "config-export $LOCAL_SITE_ALIAS"
+    drush $LOCAL_SITE_ALIAS config-export
+    (
+      cd "$LOCAL_ROOT/sites/default/config"
+      git add .
+      git commit -m "Initial export of configuration."
+      git push origin master
+    )
+    IMPORT_CONFIGURATION=false
+  fi
 
+  # In the case of a --revert, import the configuration again.
   if $IMPORT_CONFIGURATION
   then
+    $DEBUGMSG "config-import $LOCAL_SITE_ALIAS"
     drush $LOCAL_SITE_ALIAS config-import
   fi
 
@@ -439,7 +537,7 @@ __EOF__
 # Clone the site created above to another local site.
 #
 else
-  $DEBUGMSG "Local Drupal site clone tbd."
+  $DEBUGMSG "Local-to-local Drupal site clone tbd."
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -457,3 +555,6 @@ then
   echo "# Repeat in every open terminal."
   echo "#"
 fi
+
+echo
+echo "TIP:  Use `drush $LOCAL_SITE_ALIAS rs` to run the local site with the php built-in webserver."
