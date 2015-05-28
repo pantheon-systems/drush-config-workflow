@@ -37,7 +37,7 @@ Bob is now ready to go to work.  He has defined some blocks and set up the basic
 
 Alice has not been idle, though; she has made changes to her content type, and committed them to the repository as commit (F2).  When Alice sees that Bob has made some progress with the site structure, she decides to merge the changes in to her new feature branch.  Alice is going to use the Drush `config-merge` command to do this.
 ```
-$ drush @dev config-merge --git --message="Merge in Bob’s work."
+$ drush @dev config-merge @stage --git --message="Merge in Bob’s work."
 ```
 This command does quite a lot.  The --git flag tells `config-merge` that Alice would like to use git push and git pull to move the changes from the staging machine to her machine.  Alice has set up the staging server such that it can push to the central repository, so this mode is available for use.  In “git” mode, the config-export command does the following operations:
 
@@ -56,3 +56,12 @@ Alice then runs the config-merge command again, to combine configuration changes
 [kdiff3 diagram--if I am going to show a diff, then I need to have an example of what is being changed for context.]
 
 Once this is done, Alice creates tag <T2> and does another deployment to the staging server, bringing Bob’s environment back into sync with her changes.
+
+Later in the project, Alice receives an email from Bob.  He finished up some work, and wants Alice to try his changes with the code she is working on before they deploy it to the staging server.  Bob assures Alice that his changes worked fine on his machine before he exported and committed them to the git repository.  Alice can once again use the `config-merge` command to pull in his changes.  She types:
+```
+$ drush @dev config-merge --git --message="More stuff from Bob."
+```
+When config-merge is not given a target site alias to merge with, it skips the first config-export step, and simply merges the configuration exported from @dev with whatever is currently checked in to git.  If Bob was a little more responsible, he might have committed his changes on a branch, instead of putting them right into master.  In this instance, `config-merge` can still be used--it just needs to be told which branch to use.
+```
+$ drush @dev config-merge --git --message="More stuff from Bob." --branch=bobs-stuff
+```
