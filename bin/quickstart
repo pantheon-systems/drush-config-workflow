@@ -33,6 +33,7 @@ PORT=8778
 
 # Default option values
 DEBUG=false
+VERBOSE=false
 TRACE=false
 FORCE=false
 MYSQL_USER=root
@@ -43,6 +44,8 @@ COPY_DATABASE=false
 IMPORT_CONFIGURATION=false
 MODIFIED_BASHRC=false
 DEBUGMSG=test
+VERBOSEMSG=test
+
 MSG='echo # '
 ERROR='echo '
 
@@ -379,7 +382,7 @@ then
   aborterr "Could not use terminus to determine logged-in status."
   if [ "$WHOAMI" == "You are not logged in." ]
   then
-    $ERROR "Please login first with `terminus auth login`" >&2
+    $ERROR "Please login first with \`terminus auth login\`" >&2
     exit 1
   fi
 
