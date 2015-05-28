@@ -4,7 +4,7 @@ This document describes the components you will need in order to use the `drush 
 
 You can quickly get started by running the `quickstart` script:
 ```
-./scripts/quickstart [pantheon-site-name]
+./bin/quickstart [pantheon-site-name]
 ```
 This will install all of the software that you need, and create a pair of local Drupal sites to work with.  Optionally, if you provide the name of a Drupal 8 Pantheon site as an argument to quickstart, then it will create a local copy of the "dev" environment for that site.
 
