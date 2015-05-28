@@ -414,7 +414,7 @@ then
   REPO="ssh://codeserver.dev.$UUID@codeserver.dev.$UUID.drush.in:2222/~/repository.git"
   $DEBUGMSG "Repository is $REPO"
 
-  HASH_SALT="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1)"
+  HASH_SALT="$(base64 /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1)"
   $DEBUGMSG "Hash_salt is $HASH_SALT"
 
   LOCAL_ROOT="$BASE_DIR/$PANTHEON_SITE"
@@ -478,7 +478,7 @@ __EOF__
     # Make sure that the parent directory of $LOCAL_ROOT exists
     mkdir -p "$(dirname $LOCAL_ROOT)"
     cd "$(dirname $LOCAL_ROOT)"
-    git clone "$REPO" $(basename $LOCAL_ROOT)
+    git clone --depth 1 "$REPO" $(basename $LOCAL_ROOT)
     aborterr "Could not clone the git repository '$REPO' to $LOCAL_ROOT"
     cd "$LOCAL_ROOT"
   fi
