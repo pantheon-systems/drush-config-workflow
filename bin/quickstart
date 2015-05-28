@@ -623,8 +623,8 @@ echo "TIP:  \`drush $LOCAL_SITE_ALIAS rs /\` - run local site w/ php built-in we
 else
 
 echo
-echo "TIP 1:  \`drush $LOCAL_SITE_ALIAS rs\` - run local site w/ php built-in webserver."
+echo "TIP 1:  \`drush $LOCAL_SITE_ALIAS rs /\` - run local site w/ php built-in webserver."
 echo
-echo "TIP 2:  \`drush $LOCAL_SITE_ALIAS cm $PANTHEON_SITE_ALIAS\` - merge configuration changes"
+echo "TIP 2:  \`drush $LOCAL_SITE_ALIAS cm $PANTHEON_SITE_ALIAS --temp\` - merge configuration changes"
 
 fi
