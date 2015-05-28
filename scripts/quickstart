@@ -286,23 +286,6 @@ else
   $DEBUGMSG "Terminus already installed."
 fi
 
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-#  S E T   U P   F I R S T   D R U P A L   S I T E
-#
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-#
-# Local site creation.
-#
-# If a Pantheon site was specified, then there is nothing to do here.
-#
-if [ -z "PANTHEON_SITE" ]
-then
-
-  $DEBUGMSG "Local Drupal site creation tbd."
-
-fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
@@ -330,6 +313,26 @@ if [ "$?" != "0" ] ; then
 fi
 
 $DEBUGMSG "Mysql credentials are okay."
+
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  S E T   U P   F I R S T   D R U P A L   S I T E
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#
+# Local site creation.
+#
+# If a Pantheon site was specified, then there is nothing to do here.
+#
+if [ -z "PANTHEON_SITE" ]
+then
+
+  $DEBUGMSG "Local Drupal site creation tbd."
+
+fi
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
