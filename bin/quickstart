@@ -423,6 +423,9 @@ then
   LOCAL_SITE_ALIAS="@local.$PANTHEON_SITE"
   $VERBOSEMSG "Local site alias is $LOCAL_SITE_ALIAS"
 
+  LOCAL_SITE_DB="$(echo ${PANTHEON_SITE}localdb | sed -e 's/[^a-zA-Z0-9]//g')"
+  $VERBOSEMSG "Local site alias is $LOCAL_SITE_ALIAS"
+
   PANTHEON_SITE_ALIAS="@pantheon.$PANTHEON_SITE.dev"
   $VERBOSEMSG "Pantheon site alias is $PANTHEON_SITE_ALIAS"
 
@@ -522,7 +525,7 @@ cat << __EOF__ > sites/default/settings.local.php
 \$settings['hash_salt'] = '$HASH_SALT';
 
 \$databases['default']['default'] = array (
-  'database' => '${PANTHEON_SITE}localdb',
+  'database' => '${LOCAL_SITE_DB}',
   'username' => '$MYSQL_USER',
   'password' => '$MYSQL_PASSWORD',
   'prefix' => '',
