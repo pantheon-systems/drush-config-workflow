@@ -32,11 +32,19 @@ Insure that PHP 5.4 or later, and an SQL database are installed before you begin
 ## Installing Drush 8
 Follow the [installation instructions in the Drush documentation](http://docs.drush.org/en/master/install/) to install Drush 8.  Most users should be able to upgrade from Drush 5 or Drush 6 to version 8 without encountering any issues.  Currently, only Drupal 8 is supported by the config-merge command.  A Drupal 7 version may be provided in the future.
 
-## Installing Terminus CLA
+## Installing Terminus CLI
 
-Follow the [terminus installation instructions](https://github.com/pantheon-systems/cli/wiki/Installation).
+To get a super quick start with Terminus you can just snag the latest release:
+
+```
+curl https://github.com/pantheon-systems/cli/releases/download/0.5.5/terminus.phar \
+  -L -o /usr/local/bin/terminus && chmod +x /usr/local/bin/terminus
+```
+
+For more detail, see the [terminus installation instructions](https://github.com/pantheon-systems/cli/wiki/Installation).
 
 ## Installing Drupal 8
+
 If you already have a remote Drupal 8 testing site, then you may use it to try out config-merge.  Otherwise, you'll need to make a pair of local sites to work with.  These sites should share the same git repository, and they should have the same site UUID--meaning, that the database of the working site should be a copy of the databse on the first site.
 
 You can create the first site on Pantheon, or create it locally using `drush qd`:
