@@ -46,6 +46,16 @@ DEBUGMSG=test
 MSG='echo # '
 ERROR='echo '
 
+# Exit if the previous function returns an error
+function aborterr() {
+  if [ $? != 0 ]
+  then
+    echo "$1" >&2
+    exit 1
+  fi
+}
+
+
 #
 # Parse command line args
 #
@@ -55,9 +65,16 @@ while [ $# -gt 0 ] ; do
   shift
 
   case "$option" in
+    -v|--verbose)
+      VERBOSE=true
+      VERBOSEMSG='echo # '
+      ;;
+
     -d|--debug)
       DEBUG=true
       DEBUGMSG='echo ### '
+      VERBOSE=true
+      VERBOSEMSG='echo # '
       ;;
 
     --trace)
@@ -130,6 +147,7 @@ fi
 if [ -z "$HAS_PHP" ]
 then
   $ERROR "Install php before running this script." >&2
+  exit 1
 fi
 
 # Create an initial bashrc if one does not already exist.
@@ -164,8 +182,9 @@ case "$OS" in
     if [ -z "$HAS_KDIFF3" ]
     then
       brew install Caskroom/cask/kdiff3
+      aborterr "Could not install kdiff3 via 'brew install'."
     else
-      $DEBUGMSG "kdiff3 already installed."
+      $VERBOSEMSG "kdiff3 already installed."
     fi
     ;;
 
@@ -174,8 +193,9 @@ case "$OS" in
     then
       echo "$0 would like to install kdiff3"
       sudo apt-get install kdiff3
+      aborterr "Could not install kdiff3 via 'apt-get install'."
     else
-      $DEBUGMSG "kdiff3 already installed."
+      $VERBOSEMSG "kdiff3 already installed."
     fi
     ;;
 
@@ -198,17 +218,20 @@ if [ -z "$HAS_COMPOSER" ]
 then
   # Download composer and place it in $HOME/bin
   curl -sS https://getcomposer.org/installer | php
+  aborterr "Could not install composer."
   mkdir -p "$HOME/bin"
   mv composer.phar "$HOME/bin/composer"
+  aborterr "Could not move composer to ~/bin"
 
   # If $HOME/bin is not already in the user's $PATH, then add it to ~/.bashrc
   if [ -z "$(which composer)" ] ; then
     sed -i '1i export PATH=$PATH:$HOME/bin' ~/.bashrc
+    aborterr "Could not add PATH modification to .bashrc."
     export PATH="$PATH:$HOME/bin"
     MODIFIED_BASHRC=true
   fi
 else
-  $DEBUGMSG "Composer already installed."
+  $VERBOSEMSG "Composer already installed."
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -261,13 +284,14 @@ then
     $ERROR "Please upgrade to Drush 8 before running this script." >&2
     exit 1
   else
-    $DEBUGMSG "Drush 8 already installed."
+    $VERBOSEMSG "Drush 8 already installed."
   fi
 else
   $MSG "Installing Drush"
 
   # Install Drush via composer
   composer global require drush/drush:dev-master --prefer-source
+  aborterr "Could not install drush via 'composer global require'."
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -281,9 +305,10 @@ then
   $MSG "Installing Terminus"
 
   curl https://github.com/pantheon-systems/cli/releases/download/0.5.5/terminus.phar -L -o $HOME/bin/terminus
+  aborterr "Could not download terminus."
   chmod +x $HOME/bin/terminus
 else
-  $DEBUGMSG "Terminus already installed."
+  $VERBOSEMSG "Terminus already installed."
 fi
 
 
@@ -312,7 +337,7 @@ if [ "$?" != "0" ] ; then
   exit 1
 fi
 
-$DEBUGMSG "Mysql credentials are okay."
+$VERBOSEMSG "Mysql credentials are okay."
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -336,7 +361,7 @@ fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
-#  C L O N E   A   " W O R K I N G "   D R U P A L   S I T E
+#  M A K E   A   " W O R K I N G   C O P Y "   O F   A   D R U P A L   S I T E
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -347,10 +372,11 @@ fi
 #
 if [ -n "$PANTHEON_SITE" ]
 then
-  $DEBUGMSG "Pantheon site is $PANTHEON_SITE"
+  $VERBOSEMSG "Pantheon site is $PANTHEON_SITE"
 
   # Insure that we are logged in
   WHOAMI=$(terminus auth whoami)
+  aborterr "Could not use terminus to determine logged-in status."
   if [ "$WHOAMI" == "You are not logged in." ]
   then
     $ERROR "Please login first with `terminus auth login`" >&2
@@ -359,6 +385,7 @@ then
 
   # Check our connection mode
   CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV")
+  aborterr "Could not use terminus to determine the connection mode of the $PANTHEON_ENV environment of the Pantheon site '$PANTHEON_SITE'."
   $DEBUGMSG "$CONNECTION_MODE"
   echo "$CONNECTION_MODE" | grep -qi git
   if [ "$?" != "0" ]
@@ -366,7 +393,9 @@ then
     if $FORCE
     then
       terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV" --set=git
+      aborterr "Could not use terminus to set the connection mode of the $PANTHEON_ENV environment of the Pantheon site '$PANTHEON_SITE' to 'git'."
       CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV")
+      aborterr "Could not use terminus to determine the connection mode of the $PANTHEON_ENV environment of the Pantheon site '$PANTHEON_SITE'."
     else
       $ERROR "The site $PANTHEON_SITE is not in 'git' mode.  Fix this via 'terminus site connection-mode --site=\"$PANTHEON_SITE\" --env=\"$PANTHEON_ENV\" --set=git', or run again with --force to force-switch to 'git' mode." >&2
       exit 1
@@ -376,11 +405,7 @@ then
 
   # Record some basic information
   UUID=$(terminus site info --site="$PANTHEON_SITE" --field=id)
-  if [ "$?" != "0" ]
-  then
-    $ERROR "Could not determine UUID for $PANTHEON_SITE" >&2
-    exit 1
-  fi
+  aborterr "Could not use terminus to determine the site UUID for the Pantheon site '$PANTHEON_SITE'."
   $DEBUGMSG "UUID is $UUID"
 
   REPO="ssh://codeserver.dev.$UUID@codeserver.dev.$UUID.drush.in:2222/~/repository.git"
@@ -390,13 +415,13 @@ then
   $DEBUGMSG "Hash_salt is $HASH_SALT"
 
   LOCAL_ROOT="$BASE_DIR/$PANTHEON_SITE"
-  $DEBUGMSG "Local root is $LOCAL_ROOT"
+  $VERBOSEMSG "Local root is $LOCAL_ROOT"
 
   LOCAL_SITE_ALIAS="@local.$PANTHEON_SITE"
-  $DEBUGMSG "Local site alias is $LOCAL_SITE_ALIAS"
+  $VERBOSEMSG "Local site alias is $LOCAL_SITE_ALIAS"
 
   PANTHEON_SITE_ALIAS="@pantheon.$PANTHEON_SITE.dev"
-  $DEBUGMSG "Pantheon site alias is $PANTHEON_SITE_ALIAS"
+  $VERBOSEMSG "Pantheon site alias is $PANTHEON_SITE_ALIAS"
 
   #
   # Create a local copy of the Pantheon site.
@@ -408,39 +433,50 @@ then
   # 1. Make sure that your Pantheon Aliases are up-to-date:
 
   terminus sites aliases
+  aborterr "Could not update Drush aliases using Terminus."
 
   # 2. Make an alias for your local site.
 
-  # Make a site alias for the local site
+  # Create the local.aliases.drushrc.php file if it does not already exist.
   mkdir -p "$HOME/.drush"
+  aborterr "Could not create ~/.drush folder."
   LOCAL_ALIAS_FILE="$HOME/.drush/local.aliases.drushrc.php"
   if [ ! -f  "$LOCAL_ALIAS_FILE" ]
   then
     echo "<?php" > "$LOCAL_ALIAS_FILE"
   fi
 
-  cat << __EOF__ >> "$LOCAL_ALIAS_FILE"
+  # Only add an alias if there isn't already an entry for it in the file.
+  grep -q "aliases\[\"$PANTHEON_SITE\"\]" "$LOCAL_ALIAS_FILE"
+  if [ "$?" != "0" ] ; then
+
+    # Append our alias to the end of our local aliases file.
+    cat << __EOF__ >> "$LOCAL_ALIAS_FILE"
 
 \$aliases["$PANTHEON_SITE"] = array(
   'root' => '$LOCAL_ROOT',
   'uri' => 'localhost:$PORT',
 );
 __EOF__
+  fi
+  aborterr "Could not create an alias for '$PANTHEON_SITE' in '$LOCAL_ALIAS_FILE'."
 
   # 3. Check out the code for the Pantheon site.
 
   # If the site was already cloned, just update it.
   if [ -d "$LOCAL_ROOT" ]
   then
-    $DEBUGMSG "Update code from git repository"
+    $MSG "Update code from git repository"
     cd "$LOCAL_ROOT"
     git pull origin master
+    aborterr "Could not pull the master branch from the git remote origin."
   else
-    $DEBUGMSG "Clone git repository"
+    $MSG "Clone git repository"
     # Make sure that the parent directory of $LOCAL_ROOT exists
     mkdir -p "$(dirname $LOCAL_ROOT)"
     cd "$(dirname $LOCAL_ROOT)"
     git clone "$REPO" $(basename $LOCAL_ROOT)
+    aborterr "Could not clone the git repository '$REPO' to $LOCAL_ROOT"
     cd "$LOCAL_ROOT"
   fi
 
@@ -448,21 +484,24 @@ __EOF__
 
   if [ ! -f "$LOCAL_ROOT/.gitignore" ]
   then
-    $DEBUGMSG "Set up .gitignore file"
+    $VERBOSEMSG "Set up .gitignore file"
     cp "$LOCAL_ROOT/example.gitignore" "$LOCAL_ROOT/.gitignore"
     git add "$LOCAL_ROOT/.gitignore"
     git commit -m "Create .gitignore file."
+    aborterr "Could not create .gitignore file."
   fi
 
   # 5. Configure your settings.php file
 
   grep -q settings.local.php "$LOCAL_ROOT/sites/default/settings.php"
   if [ "$?" != "0" ] ; then
-    $DEBUGMSG "Include settings.local.php from settings.php"
+    $VERBOSEMSG "Include settings.local.php from settings.php"
     echo 'if (file_exists(__DIR__ . "/settings.local.php")) { include __DIR__ . "/settings.local.php"; }' >> sites/default/settings.php
     git add sites/default/settings.php
     git commit -m "Add an include local settings line in settings.php"
+    aborterr "Could not add an include for settings.local.php to settings.php."
     git push
+    aborterr "Could not push modified settings.php back to the central git repository."
   fi
 
   # 6. Define local configuration values in your settings.local.php file
@@ -470,7 +509,7 @@ __EOF__
   if [ ! -f "sites/default/settings.local.php" ]
   then
 
-  $DEBUGMSG "Create settings.local.php"
+  $VERBOSEMSG "Create settings.local.php"
 
 cat << __EOF__ > sites/default/settings.local.php
 <?php
@@ -498,17 +537,23 @@ __EOF__
 
     # Create the local database at the same time that we
     # set up the settings.php file.
-    drush $PANTHEON_SITE_ALIAS sql-create
+    $VERBOSEMSG drush $LOCAL_SITE_ALIAS sql-create
+    drush $LOCAL_SITE_ALIAS sql-create
     COPY_DATABASE=true
 
   fi
+  aborterr "Could not create settings.local.php file."
 
   # 7. Copy the database from Pantheon to the local site
 
   if $COPY_DATABASE
   then
-    $DEBUGMSG "sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS"
-    drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS
+    SQL_DUMP="/tmp/$PANTHEON_SITE.sql"
+    SQL_DUMP_GZ="/tmp/$PANTHEON_SITE.sql.gz"
+    rm -f "$SQL_DUMP" "$SQL_DUMP_GZ"
+    $VERBOSEMSG "drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS"
+    drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
+    aborterr "Drush sql-sync failed."
   fi
 
   # If we have never used the configuration tools before, then
@@ -516,13 +561,16 @@ __EOF__
   # instance, we should export the current configuration and commit it.
   if [ ! -f "$LOCAL_ROOT/sites/default/config/system.site.yml" ]
   then
-    $DEBUGMSG "config-export $LOCAL_SITE_ALIAS"
+    $VERBOSEMSG "config-export $LOCAL_SITE_ALIAS"
     drush $LOCAL_SITE_ALIAS config-export
+    aborterr "Could not make an initial export of the configuration directory on '$LOCAL_SITE_ALIAS'."
     (
       cd "$LOCAL_ROOT/sites/default/config"
       git add .
       git commit -m "Initial export of configuration."
+      aborterr "Could not commit the configuration directory for '$LOCAL_SITE_ALIAS'."
       git push origin master
+      aborterr "Could not push the configuration directory back to the central git repository."
     )
     IMPORT_CONFIGURATION=false
   fi
@@ -530,8 +578,9 @@ __EOF__
   # In the case of a --revert, import the configuration again.
   if $IMPORT_CONFIGURATION
   then
-    $DEBUGMSG "config-import $LOCAL_SITE_ALIAS"
+    $VERBOSEMSG "config-import $LOCAL_SITE_ALIAS"
     drush $LOCAL_SITE_ALIAS config-import
+    aborterr "Could not import the configuration files to $LOCAL_SITE_ALIAS."
   fi
 
 #
@@ -559,5 +608,17 @@ then
   echo "#"
 fi
 
+if [ -z "$PANTHEON_SITE_ALIAS" ]
+then
+
 echo
-echo "TIP:  Use `drush $LOCAL_SITE_ALIAS rs` to run the local site with the php built-in webserver."
+echo "TIP:  \`drush $LOCAL_SITE_ALIAS rs\` - run local site w/ php built-in webserver."
+
+else
+
+echo
+echo "TIP 1:  \`drush $LOCAL_SITE_ALIAS rs\` - run local site w/ php built-in webserver."
+echo
+echo "TIP 2:  \`drush $LOCAL_SITE_ALIAS cm $PANTHEON_SITE_ALIAS\` - merge configuration changes"
+
+fi
