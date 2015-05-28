@@ -151,6 +151,30 @@ fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
+#  G E T   D R U S H
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+if [ -n "$HAS_DRUSH" ]
+then
+  DRUSH_VERSION="$(drush version --pipe)"
+  echo $DRUSH_VERSION | grep '^8' > /dev/null
+  if [ "$?" != "0" ]
+  then
+    $ERROR "Please upgrade to Drush 8 before running this script." >&2
+    exit 1
+  else
+    $DEBUGMSG "Drush 8 already installed."
+  fi
+else
+  $MSG "Installing Drush"
+
+  # Install Drush via composer
+  composer global require drush/drush:dev-master --prefer-source
+fi
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
 #  O . S .  -  S P E C I F I C
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -244,30 +268,6 @@ __END__
   rm "$HOME/.bashrc-head"
   rm "$HOME/.bashrc-body"
   MODIFIED_BASHRC=true
-fi
-
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#
-#  G E T   D R U S H
-#
-#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-if [ -n "$HAS_DRUSH" ]
-then
-  DRUSH_VERSION="$(drush version --pipe)"
-  echo $DRUSH_VERSION | grep '^8' > /dev/null
-  if [ "$?" != "0" ]
-  then
-    $ERROR "Please upgrade to Drush 8 before running this script." >&2
-    exit 1
-  else
-    $DEBUGMSG "Drush 8 already installed."
-  fi
-else
-  $MSG "Installing Drush"
-
-  # Install Drush via composer
-  composer global require drush/drush:dev-master --prefer-source
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
