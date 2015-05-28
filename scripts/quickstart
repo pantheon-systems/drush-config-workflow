@@ -612,7 +612,7 @@ if [ -z "$PANTHEON_SITE_ALIAS" ]
 then
 
 echo
-echo "TIP:  \`drush $LOCAL_SITE_ALIAS rs\` - run local site w/ php built-in webserver."
+echo "TIP:  \`drush $LOCAL_SITE_ALIAS rs /\` - run local site w/ php built-in webserver."
 
 else
 
