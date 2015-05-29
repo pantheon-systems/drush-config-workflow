@@ -1,19 +1,38 @@
 #!/bin/bash
 
 #
-# Usage:
+# Quickstart
 #
-#   ./scripts/quickstart [pantheon-site-name] [install-path]
+#   Quickly set up an environment where you can experiment with
+#   the drush config-merge commands.
 #
 # Purpose:
 #
 #   This script wil install all of the components needed to use
-#   the `drush config-merge` command.  It will also create two
-#   local Drupal 8 sites to experiment with.
+#   the `drush config-merge` command, and will also create a
+#   pair of sites for you to work with.
 #
-#   If the name of a Pantheon site is provided as a commandline
-#   argument, then only one local site will be created, and it
-#   will be a clone of the remote Pantheon site.
+#   The two sites can either both be local, or, alternately, one
+#   can be hosted on Pantheon, in which case a local clone of the
+#   specified Pantheon site will be created.
+#
+#   In either case, the sites will share a central git repository,
+#   and the database of the cloned site will be created from a copy
+#   of the other site -- both necessary preconditions for using
+#   Drush config-merge.
+#
+# Usage to make a local dev / test environment:
+#
+#   $ ./bin/quickstart --create-local-sites foo
+#
+#   This will create @local.foo.dev and @local.foo.test.
+#
+# Usage to make a local clone of a Pantheon site:
+#
+#   $ ./bin/quickstart sitename [install-path]
+#
+#   This will create @local.sitename from an existing Pantheon
+#   site @pantheon.sitename.dev.
 #
 # Notes:
 #
@@ -22,7 +41,8 @@
 #   you have already installed before running this script.
 #
 #   Use --revert to erase the "working" site, and make it once again
-#   a fresh copy of the dev site.
+#   a fresh copy of the dev site.  Using this option obviously removes
+#   the idempotency of this script.
 #
 
 # Default argument values
@@ -291,6 +311,11 @@ while [ $# -gt 0 ] ; do
     --revert)
       COPY_DATABASE=true
       IMPORT_CONFIGURATION=true
+      ;;
+
+    -c|--create-local-sites)
+      LOCAL_SITES_BASENAME="$1"
+      shift
       ;;
 
     --pantheon)
@@ -568,22 +593,115 @@ $VERBOSEMSG "Mysql credentials are okay."
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
-#  S E T   U P   F I R S T   D R U P A L   S I T E
+#  S E T   U P   A   P A I R   O F   T E S T    D R U P A L   S I T E S
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 #
 # Local site creation.
 #
-# If a Pantheon site was specified, then there is nothing to do here.
-#
-if [ -z "PANTHEON_SITE" ]
+if [ -n "$LOCAL_SITES_BASENAME" ]
 then
 
-  $DEBUGMSG "Local Drupal site creation tbd."
+  LOCAL_DEV="$LOCAL_SITES_BASENAME.dev"
+  LOCAL_TEST="$LOCAL_SITES_BASENAME.test"
 
+  LOCAL_DEV_ROOT="$BASE_DIR/$LOCAL_DEV"
+  $VERBOSEMSG "Local root for dev site is $LOCAL_DEV_ROOT"
+
+  LOCAL_TEST_ROOT="$BASE_DIR/$LOCAL_TEST"
+  $VERBOSEMSG "Local root for test site is $LOCAL_TEST_ROOT"
+
+  DEV_SITE_ALIAS="@$LOCAL_DEV"
+  $VERBOSEMSG "Dev site alias is $DEV_SITE_ALIAS"
+
+  TEST_SITE_ALIAS="@$LOCAL_TEST"
+  $VERBOSEMSG "Test site alias is $TEST_SITE_ALIAS"
+
+  DEV_PORT=6666
+  TEST_PORT=9999
+
+  # 1. Make an alias for both local sites.
+
+  create_local_alias "$LOCAL_DEV" "$LOCAL_DEV_ROOT" "localhost:$DEV_PORT"
+  create_local_alias "$LOCAL_TEST" "$LOCAL_TEST_ROOT" "localhost:$TEST_PORT"
+
+  # 2. Create a Drupal 8 test site with drush qd
+
+  if [ ! -d "$LOCAL_TEST_ROOT" ]
+  then
+
+    local TEST_SITE_DB="$(echo ${SITE}testdb | sed -e 's/[^a-zA-Z0-9]//g')"
+    $VERBOSEMSG "Test site database is $TEST_SITE_DB"
+
+    cd "$(dirname $LOCAL_TEST_ROOT)"
+    rm -rf "$(basename $LOCAL_TEST_ROOT)" # If there is already an old site here
+    drush qd --core=drupal-8.0.x --db-url="mysql://$MYSQL_USER:$MYSQL_PASSWORD@localhost/$TEST_SITE_DB" "$(basename $LOCAL_TEST_ROOT)" --no-server
+    check "Created a new local 'test' Drupal site $TEST_SITE_ALIAS" "Could not create $TEST_SITE_ALIAS using drush qd"
+  fi
+
+  # 3. Create a .gitignore file for the test site
+
+  create_gitignore "$LOCAL_TEST_ROOT"
+
+  # 4. Touch up the configuration directories in settings.php and export configuration
+
+  chmod +w "$LOCAL_TEST_ROOT/sites/default/settings.php"
+  cat << __EOF__ >> "$LOCAL_TEST_ROOT/sites/default/settings.php"
+
+\$config_directories['active'] = 'sites/default/files/config/active';
+\$config_directories['staging'] = 'sites/default/config/staging';
+__EOF__
+
+  drush $TEST_SITE_ALIAS config-export
+
+  # 5. Make a git repository for the test site
+
+  cd "$LOCAL_TEST_ROOT"
+  git init
+  git add .
+  git commit -m "Initial commit"
+  check "Created a git repository for the test site" "Could not create a git repository for the test site."
+
+  # 6. Set up a bare repository to serve as the central repository for both sites
+
+  GIT_BASE_DIR="$HOME/local/git"
+  GIT_DIR="$GIT_BASE_DIR/${LOCAL_SITES_BASENAME}.git"
+
+  mkdir -p "$GIT_DIR"
+  aborterr "Could not create $GIT_DIR"
+  cd "$GIT_DIR"
+  git init --bare
+  aborterr "Could not create a bare git repository at $GIT_DIR"
+  cd "$LOCAL_TEST_ROOT"
+  git remote add origin "$GIT_DIR"
+  aborterr "Could not add $GIT_DIR as an origin at $LOCAL_TEST_ROOT"
+  git push origin master
+  git check "Created a central git repository for the dev and test sites" "Could not push to the central repository at $GIT_DIR"
+
+  # 7. Check out the code from the repository again for the local "dev" site
+
+  clone_repository "$LOCAL_SITES_BASENAME" "$GIT_DIR" "$LOCAL_DEV_ROOT"
+
+  cd "$LOCAL_DEV_ROOT"
+
+  # 8. Configure your settings.php file
+  # 9. Define local configuration values in your settings.local.php file
+
+  configure_settings_php "$LOCAL_SITES_BASENAME" "$LOCAL_DEV_ROOT"
+
+  # 10. Copy the database from Pantheon to the local site
+
+  if $COPY_DATABASE
+  then
+    SQL_DUMP="/tmp/$LOCAL_SITES_BASENAME.sql"
+    SQL_DUMP_GZ="/tmp/$LOCAL_SITES_BASENAME.sql.gz"
+    rm -f "$SQL_DUMP" "$SQL_DUMP_GZ"
+    $MSG "drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS"
+    drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
+    check "Copied the database of the site '$LOCAL_SITES_BASENAME'" "Drush sql-sync failed."
+  fi
 fi
-
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
@@ -638,11 +756,11 @@ then
   LOCAL_ROOT="$BASE_DIR/$PANTHEON_SITE"
   $VERBOSEMSG "Local root is $LOCAL_ROOT"
 
-  LOCAL_SITE_ALIAS="@local.$PANTHEON_SITE"
-  $VERBOSEMSG "Local site alias is $LOCAL_SITE_ALIAS"
+  DEV_SITE_ALIAS="@local.$PANTHEON_SITE"
+  $VERBOSEMSG "Local site alias is $DEV_SITE_ALIAS"
 
-  PANTHEON_SITE_ALIAS="@pantheon.$PANTHEON_SITE.dev"
-  $VERBOSEMSG "Pantheon site alias is $PANTHEON_SITE_ALIAS"
+  TEST_SITE_ALIAS="@pantheon.$PANTHEON_SITE.dev"
+  $VERBOSEMSG "Pantheon site alias is $TEST_SITE_ALIAS"
 
   #
   # Create a local copy of the Pantheon site.
@@ -682,8 +800,8 @@ then
     SQL_DUMP="/tmp/$PANTHEON_SITE.sql"
     SQL_DUMP_GZ="/tmp/$PANTHEON_SITE.sql.gz"
     rm -f "$SQL_DUMP" "$SQL_DUMP_GZ"
-    $MSG "drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS"
-    drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
+    $MSG "drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS"
+    drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
     check "Copied the database of the site '$PANTHEON_SITE'" "Drush sql-sync failed."
   fi
 
@@ -694,14 +812,14 @@ then
   # instance, we should export the current configuration and commit it.
   if [ ! -f "$LOCAL_ROOT/sites/default/config/system.site.yml" ]
   then
-    $MSG "Export initial configuration for $LOCAL_SITE_ALIAS"
-    drush $LOCAL_SITE_ALIAS config-export
-    check "Exported the configuration for '$LOCAL_SITE_ALIAS'" "Could not make an initial export of the configuration directory on '$LOCAL_SITE_ALIAS'."
+    $MSG "Export initial configuration for $DEV_SITE_ALIAS"
+    drush $DEV_SITE_ALIAS config-export
+    check "Exported the configuration for '$DEV_SITE_ALIAS'" "Could not make an initial export of the configuration directory on '$DEV_SITE_ALIAS'."
     (
       cd "$LOCAL_ROOT/sites/default/config"
       git add .
       git commit -m "Initial export of configuration."
-      aborterr "Could not commit the configuration directory for '$LOCAL_SITE_ALIAS'."
+      aborterr "Could not commit the configuration directory for '$DEV_SITE_ALIAS'."
       git push origin master
       aborterr "Could not push the configuration directory back to the central git repository."
     )
@@ -711,9 +829,9 @@ then
   # In the case of a --revert, import the configuration again.
   if $IMPORT_CONFIGURATION
   then
-    $MSG "Re-import configuration for $LOCAL_SITE_ALIAS"
-    drush $LOCAL_SITE_ALIAS config-import
-    aborterr "Could not import the configuration files to $LOCAL_SITE_ALIAS."
+    $MSG "Re-import configuration for $DEV_SITE_ALIAS"
+    drush $DEV_SITE_ALIAS config-import
+    aborterr "Could not import the configuration files to $DEV_SITE_ALIAS."
   fi
 
 fi
@@ -724,16 +842,13 @@ fi
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+echo
+echo "------------------------------------------------------------------------"
+echo
+
 if [ 0 == "${#ACCOMPLISHMENTS[@]}" ]
 then
   echo "Nothing to do here."
-
-  if [ -z "$PANTHEON_SITE_ALIAS" ]
-  then
-    echo "Run this script again with the name of a Pantheon site to clone."
-    echo "The local-local setup script is not available yet."
-  fi
-
 else
   echo "Congratulations!  This script successfully did the following things:"
   echo
@@ -741,48 +856,101 @@ else
   do
     echo " - $a"
   done
+fi
 
-  if [ -n "$PANTHEON_SITE_ALIAS" ]
+echo
+
+if [ -n "$TEST_SITE_ALIAS" ]
+then
+
+  echo "To continue, follow the instructions below."
+  echo
+  echo "Open another terminal, and run the local dev site using the php"
+  echo "built-in webserver:"
+  echo
+  echo "    drush $DEV_SITE_ALIAS rs /"
+  echo
+  echo "This will open a web browser and log you in to the local site as"
+  echo "the administrator (uid 0)."
+  echo
+
+  if [ -n "$PANTHEON_SITE" ]
   then
 
+    echo "Next, open your Pantheon dashboard in another browser window, and"
+    echo "visit the development site for $PATHEON_SITE."
+
+  else
+
+    echo "Next, open another terminal window, and run the local test site"
+    echo "using the php built-in webserver:"
     echo
-    echo "To continue, follow the instructions below."
-    echo
-    echo "Open another terminal, and run the local site using the php"
-    echo "built-in webserver:"
-    echo
-    echo "    drush $LOCAL_SITE_ALIAS rs /"
-    echo
-    echo "This will open a web browser and log you in to the local site as"
-    echo " the administrator (uid 0).  Open your Pantheon dashboard in another"
-    echo "browser window, and visit the development site for $PATHEON_SITE."
-    echo "Make some configuration changes in each copy of the site.  To merge"
-    echo "your configuration changes from the Pantheon site into the local"
-    echo "site, run:"
-    echo
-    echo "    drush $LOCAL_SITE_ALIAS config-merge $PANTHEON_SITE_ALIAS"
-    echo
-    echo "As an experiment, try changing the site slogan on the local site,"
-    echo "and move the search block to the header region on the other site"
-    echo "using the command above.  When config-merge completes, you should"
-    echo "find that the local site has both the new site slogan, and the"
-    echo "search block should be in the header.  The Pantheon site won't"
-    echo "get the updated configuration changes until you deploy them."
-    echo
+    echo "    drush $TEST_SITE_ALIAS rs /"
+
+  fi
+
+  echo
+  echo "Make some configuration changes in each copy of the site.  To merge"
+  echo "your configuration changes from the test site ($TEST_SITE_ALIAS) into"
+  echo "the dev site ($DEV_SITE_ALIAS), run:"
+  echo
+  echo "    drush $DEV_SITE_ALIAS config-merge $TEST_SITE_ALIAS"
+  echo
+  echo "As an experiment, try changing the site slogan on the local site,"
+  echo "and move the search block to the header region on the other site"
+  echo "using the command above.  When config-merge completes, you should"
+  echo "find that the local site has both the new site slogan, and the"
+  echo "search block should be in the header.  The Pantheon site won't"
+  echo "get the updated configuration changes until you deploy them."
+  echo
+
+  if [ -n "$PANTHEON_SITE" ]
+  then
+
     echo "To deploy changes to the Pantheon site, commit them to the git"
     echo "repository (config-merge will do this step), push it to the"
     echo "central repository (git push origin master), and then import the"
     echo "configuration changes with:"
     echo
-    echo "    drush $PANTHEON_SITE_ALIAS config-import"
+    echo "    drush $TEST_SITE_ALIAS config-import"
 
+  else
+
+    echo "To deploy configuration changes from the dev site ($DEV_SITE_ALIAS)"
+    echo "to the test site ($TEST_SITE_ALIAS), run:"
+    echo
+    echo "    drush $DEV_SITE_ALIAS exec git push"
+    echo "    drush $TEST_SITE_ALIAS exec git pull"
+    echo "    drush $TEST_SITE_ALIAS config-import"
 
   fi
+
+else
+
+  echo "To create some sites to work with, run this script again with the"
+  echo "following arguments:"
+  echo
+  echo "    ./bin/quickstart --create-local-sites foo"
+  echo
+  echo "This will create a pair of sites, @local.foo.dev and @local.foo.test."
+  echo
+  echo "To work with a Pantheon site instead, run:"
+  echo
+  echo "   ./bin/quickstart sitename [install-path]"
+  echo
+  echo "This will create @local.sitename from an existing Pantheon site"
+  echo "@pantheon.sitename.dev.  Make sure that your Pantheon site is"
+  echo "using Drupal 8!  To spin up a free Drupal 8 testing site, visit the"
+  echo "following URL:"
+  echo
+  echo "   https://dashboard.pantheon.io/products/drupal8/spinup"
+
 fi
+
+echo
 
 if $MODIFIED_BASHRC
 then
-  echo
   echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   echo "!!!"
   echo "!!! IMPORTANT: To use the components installed by this script,"
@@ -791,5 +959,6 @@ then
   echo "!!! Repeat in every open terminal."
   echo "!!!"
   echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo
 fi
 
