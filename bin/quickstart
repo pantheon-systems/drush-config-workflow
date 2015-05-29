@@ -27,7 +27,7 @@
 
 # Default argument values
 PANTHEON_SITE=
-PANTHEON_ENV='dev'
+SITE_ENV='dev'
 BASE_DIR=
 PORT=8778
 
@@ -185,7 +185,7 @@ while [ $# -gt 0 ] ; do
       ;;
 
     --env)
-      PANTHEON_ENV="$1"
+      SITE_ENV="$1"
       shift
       ;;
 
@@ -491,20 +491,20 @@ then
   fi
 
   # Check our connection mode
-  CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV")
-  aborterr "Could not use terminus to determine the connection mode of the $PANTHEON_ENV environment of the Pantheon site '$PANTHEON_SITE'."
+  CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$SITE_ENV")
+  aborterr "Could not use terminus to determine the connection mode of the $SITE_ENV environment of the Pantheon site '$PANTHEON_SITE'."
   $DEBUGMSG "$CONNECTION_MODE"
   echo "$CONNECTION_MODE" | grep -qi git
   if [ "$?" != "0" ]
   then
     if $FORCE
     then
-      terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV" --set=git
-      aborterr "Could not use terminus to set the connection mode of the $PANTHEON_ENV environment of the Pantheon site '$PANTHEON_SITE' to 'git'."
-      CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$PANTHEON_ENV")
-      aborterr "Could not use terminus to determine the connection mode of the $PANTHEON_ENV environment of the Pantheon site '$PANTHEON_SITE'."
+      terminus site connection-mode --site="$PANTHEON_SITE" --env="$SITE_ENV" --set=git
+      aborterr "Could not use terminus to set the connection mode of the $SITE_ENV environment of the Pantheon site '$PANTHEON_SITE' to 'git'."
+      CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$SITE_ENV")
+      aborterr "Could not use terminus to determine the connection mode of the $SITE_ENV environment of the Pantheon site '$PANTHEON_SITE'."
     else
-      $ERROR "The site $PANTHEON_SITE is not in 'git' mode.  Fix this via 'terminus site connection-mode --site=\"$PANTHEON_SITE\" --env=\"$PANTHEON_ENV\" --set=git', or run again with --force to force-switch to 'git' mode." >&2
+      $ERROR "The site $PANTHEON_SITE is not in 'git' mode.  Fix this via 'terminus site connection-mode --site=\"$PANTHEON_SITE\" --env=\"$SITE_ENV\" --set=git', or run again with --force to force-switch to 'git' mode." >&2
       exit 1
     fi
   fi
