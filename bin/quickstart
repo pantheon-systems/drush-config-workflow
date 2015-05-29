@@ -49,6 +49,13 @@ VERBOSEMSG=false
 MSG='echo # '
 ERROR='echo '
 
+
+# Keep track of things the script did
+declare -a ACCOMPLISHMENTS
+function accomplished() {
+  ACCOMPLISHMENTS=("${ACCOMPLISHMENTS[@]}" "$1")
+}
+
 # Exit if the previous function returns an error
 function aborterr() {
   if [ $? != 0 ]
@@ -57,6 +64,13 @@ function aborterr() {
     exit 1
   fi
 }
+
+# Check the result of the last operation, and either call accomplished or aborterr
+function check() {
+  aborterr "$2"
+  accomplished "$1"
+}
+
 
 
 #
@@ -189,7 +203,7 @@ case "$OS" in
     if [ -z "$HAS_KDIFF3" ]
     then
       brew install Caskroom/cask/kdiff3
-      aborterr "Could not install kdiff3 via 'brew install'."
+      check "Installed kdiff3" "Could not install kdiff3 via 'brew install'."
     else
       $VERBOSEMSG "kdiff3 already installed."
     fi
@@ -200,7 +214,7 @@ case "$OS" in
     then
       echo "$0 would like to install kdiff3"
       sudo apt-get install kdiff3
-      aborterr "Could not install kdiff3 via 'apt-get install'."
+      check "Installed kdiff3" "Could not install kdiff3 via 'apt-get install'."
     else
       $VERBOSEMSG "kdiff3 already installed."
     fi
@@ -225,7 +239,7 @@ if [ -z "$HAS_COMPOSER" ]
 then
   # Download composer and place it in $HOME/bin
   curl -sS https://getcomposer.org/installer | php
-  aborterr "Could not install composer."
+  check "Installed Composer" "Could not install Composer."
   mkdir -p "$HOME/bin"
   mv composer.phar "$HOME/bin/composer"
   aborterr "Could not move composer to ~/bin"
@@ -298,7 +312,7 @@ else
 
   # Install Drush via composer
   composer global require drush/drush:dev-master --prefer-source
-  aborterr "Could not install drush via 'composer global require'."
+  check "Installed Drush" "Could not install Drush via 'composer global require'."
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -339,7 +353,7 @@ then
   $MSG "Installing Terminus"
 
   curl https://github.com/pantheon-systems/cli/releases/download/0.5.5/terminus.phar -L -o $HOME/bin/terminus
-  aborterr "Could not download terminus."
+  check "Installed Terminus" "Could not download Terminus."
   chmod +x $HOME/bin/terminus
 else
   $VERBOSEMSG "Terminus already installed."
@@ -470,7 +484,7 @@ then
   # 1. Make sure that your Pantheon Aliases are up-to-date:
 
   terminus sites aliases
-  aborterr "Could not update Drush aliases using Terminus."
+  check "Updated Drush aliases" "Could not update Drush aliases using Terminus."
 
   # 2. Make an alias for your local site.
 
@@ -493,8 +507,8 @@ then
   'uri' => 'localhost:$PORT',
 );
 __EOF__
+  check "Created an alias for '$PANTHEON_SITE'" "Could not create an alias for '$PANTHEON_SITE' in '$LOCAL_ALIAS_FILE'."
   fi
-  aborterr "Could not create an alias for '$PANTHEON_SITE' in '$LOCAL_ALIAS_FILE'."
 
   # 3. Check out the code for the Pantheon site.
 
@@ -506,12 +520,12 @@ __EOF__
     git pull origin master
     aborterr "Could not pull the master branch from the git remote origin."
   else
-    $MSG "Clone git repository"
+    $MSG "Making a shallow clone of the git repository"
     # Make sure that the parent directory of $LOCAL_ROOT exists
     mkdir -p "$(dirname $LOCAL_ROOT)"
     cd "$(dirname $LOCAL_ROOT)"
     git clone --depth 1 "$REPO" $(basename $LOCAL_ROOT)
-    aborterr "Could not clone the git repository '$REPO' to $LOCAL_ROOT"
+    check "Cloned the git repository for the site '$PANTHEON_SITE'" "Could not clone the git repository '$REPO' to $LOCAL_ROOT"
     cd "$LOCAL_ROOT"
   fi
 
@@ -536,7 +550,7 @@ __EOF__
     git commit -m "Add an include local settings line in settings.php"
     aborterr "Could not add an include for settings.local.php to settings.php."
     git push
-    aborterr "Could not push modified settings.php back to the central git repository."
+    check "Could not push modified settings.php back to the central git repository."
   fi
 
   # 6. Define local configuration values in your settings.local.php file
@@ -577,7 +591,7 @@ __EOF__
     COPY_DATABASE=true
 
   fi
-  aborterr "Could not create settings.local.php file."
+  check "Created a local settings file for the copy of the site '$PANTHEON_SITE'" "Could not create settings.local.php file."
 
   # 7. Copy the database from Pantheon to the local site
 
@@ -588,7 +602,7 @@ __EOF__
     rm -f "$SQL_DUMP" "$SQL_DUMP_GZ"
     $MSG "drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS"
     drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
-    aborterr "Drush sql-sync failed."
+    check "Copied the database of the site '$PANTHEON_SITE'" "Drush sql-sync failed."
   fi
 
   # If we have never used the configuration tools before, then
@@ -598,7 +612,7 @@ __EOF__
   then
     $MSG "Export initial configuration for $LOCAL_SITE_ALIAS"
     drush $LOCAL_SITE_ALIAS config-export
-    aborterr "Could not make an initial export of the configuration directory on '$LOCAL_SITE_ALIAS'."
+    check "Exported the configuration for '$LOCAL_SITE_ALIAS'" "Could not make an initial export of the configuration directory on '$LOCAL_SITE_ALIAS'."
     (
       cd "$LOCAL_ROOT/sites/default/config"
       git add .
@@ -633,27 +647,72 @@ fi
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-if $MODIFIED_BASHRC
+if [ 0 == "${#ACCOMPLISHMENTS[@]}" ]
 then
-  echo "#"
-  echo "# IMPORTANT: To use the components installed by this script,"
-  echo "#            type `source ~/.bashrc`"
-  echo "#"
-  echo "# Repeat in every open terminal."
-  echo "#"
-fi
+  echo "Nothing to do here."
 
-if [ -z "$PANTHEON_SITE_ALIAS" ]
-then
-
-echo
-echo "TIP:  \`drush $LOCAL_SITE_ALIAS rs /\` - run local site w/ php built-in webserver."
+  if [ -z "$PANTHEON_SITE_ALIAS" ]
+  then
+    echo "Run this script again with the name of a Pantheon site to clone."
+    echo "The local-local setup script is not available yet."
+  fi
 
 else
+  echo "Congratulations!  This script successfully did the following things:"
+  echo
+  for a in "${ACCOMPLISHMENTS[@]}"
+  do
+    echo " - $a"
+  done
 
-echo
-echo "TIP 1:  \`drush $LOCAL_SITE_ALIAS rs /\` - run local site w/ php built-in webserver."
-echo
-echo "TIP 2:  \`drush $LOCAL_SITE_ALIAS cm $PANTHEON_SITE_ALIAS\` - merge configuration changes"
+  if [ -n "$PANTHEON_SITE_ALIAS" ]
+  then
 
+    echo
+    echo "To continue, follow the instructions below."
+    echo
+    echo "Open another terminal, and run the local site using the php"
+    echo "built-in webserver:"
+    echo
+    echo "    drush $LOCAL_SITE_ALIAS rs /"
+    echo
+    echo "This will open a web browser and log you in to the local site as"
+    echo " the administrator (uid 0).  Open your Pantheon dashboard in another"
+    echo "browser window, and visit the development site for $PATHEON_SITE."
+    echo "Make some configuration changes in each copy of the site.  To merge"
+    echo "your configuration changes from the Pantheon site into the local"
+    echo "site, run:"
+    echo
+    echo "    drush $LOCAL_SITE_ALIAS config-merge $PANTHEON_SITE_ALIAS"
+    echo
+    echo "As an experiment, try changing the site slogan on the local site,"
+    echo "and move the search block to the header region on the other site"
+    echo "using the command above.  When config-merge completes, you should"
+    echo "find that the local site has both the new site slogan, and the"
+    echo "search block should be in the header.  The Pantheon site won't"
+    echo "get the updated configuration changes until you deploy them."
+    echo
+    echo "To deploy changes to the Pantheon site, commit them to the git"
+    echo "repository (config-merge will do this step), push it to the"
+    echo "central repository (git push origin master), and then import the"
+    echo "configuration changes with:"
+    echo
+    echo "    drush $PANTHEON_SITE_ALIAS config-import"
+
+
+  fi
 fi
+
+if $MODIFIED_BASHRC
+then
+  echo
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo "!!!"
+  echo "!!! IMPORTANT: To use the components installed by this script,"
+  echo "!!!            type \`source ~/.bashrc\`"
+  echo "!!!"
+  echo "!!! Repeat in every open terminal."
+  echo "!!!"
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+fi
+
