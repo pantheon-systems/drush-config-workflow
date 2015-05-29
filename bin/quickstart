@@ -80,6 +80,10 @@ while [ $# -gt 0 ] ; do
       VERBOSEMSG='echo # '
       ;;
 
+    -q|--quiet)
+      MSG=false
+      ;;
+
     --trace)
       TRACE=true
       ;;
@@ -490,7 +494,7 @@ __EOF__
 
   if [ ! -f "$LOCAL_ROOT/.gitignore" ]
   then
-    $VERBOSEMSG "Set up .gitignore file"
+    $MSG "Set up .gitignore file"
     cp "$LOCAL_ROOT/example.gitignore" "$LOCAL_ROOT/.gitignore"
     git add "$LOCAL_ROOT/.gitignore"
     git commit -m "Create .gitignore file."
@@ -501,7 +505,7 @@ __EOF__
 
   grep -q settings.local.php "$LOCAL_ROOT/sites/default/settings.php"
   if [ "$?" != "0" ] ; then
-    $VERBOSEMSG "Include settings.local.php from settings.php"
+    $MSG "Include settings.local.php from settings.php"
     echo 'if (file_exists(__DIR__ . "/settings.local.php")) { include __DIR__ . "/settings.local.php"; }' >> sites/default/settings.php
     git add sites/default/settings.php
     git commit -m "Add an include local settings line in settings.php"
@@ -515,7 +519,7 @@ __EOF__
   if [ ! -f "sites/default/settings.local.php" ]
   then
 
-  $VERBOSEMSG "Create settings.local.php"
+  $MSG "Create settings.local.php"
 
 cat << __EOF__ > sites/default/settings.local.php
 <?php
@@ -543,7 +547,7 @@ __EOF__
 
     # Create the local database at the same time that we
     # set up the settings.php file.
-    $VERBOSEMSG drush $LOCAL_SITE_ALIAS sql-create
+    $MSG Create database for $LOCAL_SITE_ALIAS
     drush $LOCAL_SITE_ALIAS sql-create
     COPY_DATABASE=true
 
@@ -557,7 +561,7 @@ __EOF__
     SQL_DUMP="/tmp/$PANTHEON_SITE.sql"
     SQL_DUMP_GZ="/tmp/$PANTHEON_SITE.sql.gz"
     rm -f "$SQL_DUMP" "$SQL_DUMP_GZ"
-    $VERBOSEMSG "drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS"
+    $MSG "drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS"
     drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
     aborterr "Drush sql-sync failed."
   fi
@@ -567,7 +571,7 @@ __EOF__
   # instance, we should export the current configuration and commit it.
   if [ ! -f "$LOCAL_ROOT/sites/default/config/system.site.yml" ]
   then
-    $VERBOSEMSG "config-export $LOCAL_SITE_ALIAS"
+    $MSG "Export initial configuration for $LOCAL_SITE_ALIAS"
     drush $LOCAL_SITE_ALIAS config-export
     aborterr "Could not make an initial export of the configuration directory on '$LOCAL_SITE_ALIAS'."
     (
@@ -584,7 +588,7 @@ __EOF__
   # In the case of a --revert, import the configuration again.
   if $IMPORT_CONFIGURATION
   then
-    $VERBOSEMSG "config-import $LOCAL_SITE_ALIAS"
+    $MSG "Re-import configuration for $LOCAL_SITE_ALIAS"
     drush $LOCAL_SITE_ALIAS config-import
     aborterr "Could not import the configuration files to $LOCAL_SITE_ALIAS."
   fi
