@@ -303,6 +303,33 @@ fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
+#  C O N F I G U R E   D R U S H
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Create a ~/.drush/drushrc.php file if it does not already exist.
+mkdir -p "$HOME/.drush"
+aborterr "Could not create ~/.drush folder."
+DRUSH_CONFIG_FILE="$HOME/.drush/drushrc.php"
+if [ ! -f  "$DRUSH_CONFIG_FILE" ]
+then
+  echo "<?php" > "$DRUSH_CONFIG_FILE"
+fi
+
+# Make kdiff3 the default merge tool for config-merge
+grep -q "kdiff3" "$DRUSH_CONFIG_FILE"
+if [ "$?" != "0" ] ; then
+
+  cat << __EOF__ >> "$DRUSH_CONFIG_FILE"
+
+# Set the default merge tool to use in the config-merge command.
+\$command_specific['config-merge']['tool'] = 'kdiff3';
+__EOF__
+fi
+aborterr "Could not create the Drush configuration file in $DRUSH_CONFIG_FILE."
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
 #  G E T   T E R M I N U S
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -448,8 +475,6 @@ then
   # 2. Make an alias for your local site.
 
   # Create the local.aliases.drushrc.php file if it does not already exist.
-  mkdir -p "$HOME/.drush"
-  aborterr "Could not create ~/.drush folder."
   LOCAL_ALIAS_FILE="$HOME/.drush/local.aliases.drushrc.php"
   if [ ! -f  "$LOCAL_ALIAS_FILE" ]
   then
