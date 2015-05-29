@@ -102,12 +102,12 @@ function check() {
 #   create_local_alias "ALIASNAME" /path/to/root uri
 #
 function create_local_alias() {
-  SITE="$1"
-  ROOT="$2"
-  URI="$3"
+  local SITE="$1"
+  local ROOT="$2"
+  local URI="$3"
 
   # Create the local.aliases.drushrc.php file if it does not already exist.
-  LOCAL_ALIAS_FILE="$HOME/.drush/local.aliases.drushrc.php"
+  local LOCAL_ALIAS_FILE="$HOME/.drush/local.aliases.drushrc.php"
   if [ ! -f  "$LOCAL_ALIAS_FILE" ]
   then
     echo "<?php" > "$LOCAL_ALIAS_FILE"
@@ -127,6 +127,115 @@ function create_local_alias() {
 __EOF__
   check "Created an alias for '$SITE'" "Could not create an alias for '$SITE' in '$LOCAL_ALIAS_FILE'."
   fi
+}
+
+#
+# Clone the git repository for the specified site
+#
+# Usage:
+#
+#   clone_repository "Sitename" repository /path/to/clone/to
+#
+function clone_repository() {
+  local SITE="$1"
+  local ROOT="$REPO"
+  local LOCAL_ROOT="$3"
+
+  # If the site was already cloned, just update it.
+  if [ -d "$LOCAL_ROOT" ]
+  then
+    $MSG "Update code from git repository"
+    git pull origin master
+    aborterr "Could not pull the master branch from the git remote origin."
+  else
+    $MSG "Making a shallow clone of the git repository"
+    # Make sure that the parent directory of $LOCAL_ROOT exists
+    mkdir -p "$(dirname $LOCAL_ROOT)"
+    cd "$(dirname $LOCAL_ROOT)"
+    git clone --depth 1 "$REPO" $(basename $LOCAL_ROOT)
+    check "Cloned the git repository for the site '$SITE'" "Could not clone the git repository '$REPO' to $LOCAL_ROOT"
+  fi
+}
+
+#
+# Create a gitignore file for the specified Drupal site
+#
+# Usage:
+#
+#   create_gitignore /path/to/drupalroot
+#
+function create_gitignore() {
+  local LOCAL_ROOT="$1"
+
+  if [ ! -f "$LOCAL_ROOT/.gitignore" ]
+  then
+    $MSG "Set up .gitignore file"
+    cp "$LOCAL_ROOT/example.gitignore" "$LOCAL_ROOT/.gitignore"
+    git add "$LOCAL_ROOT/.gitignore"
+    git commit -m "Create .gitignore file."
+    aborterr "Could not create .gitignore file."
+  fi
+}
+
+function configure_settings_php() {
+  local SITE="$1"
+  local LOCAL_ROOT="$2"
+  local LOCAL_SITE_ALIAS="@local.$SITE"
+
+  grep -q settings.local.php "$LOCAL_ROOT/sites/default/settings.php"
+  if [ "$?" != "0" ] ; then
+    $MSG "Include settings.local.php from settings.php"
+    echo 'if (file_exists(__DIR__ . "/settings.local.php")) { include __DIR__ . "/settings.local.php"; }' >> "$LOCAL_ROOT/sites/default/settings.php"
+    git add "$LOCAL_ROOT/sites/default/settings.php"
+    git commit -m "Add an include local settings line in settings.php"
+    aborterr "Could not add an include for settings.local.php to settings.php."
+    git push
+    check "Could not push modified settings.php back to the central git repository."
+  fi
+
+  if [ ! -f "$LOCAL_ROOT/sites/default/settings.local.php" ]
+  then
+
+  local HASH_SALT="$(base64 /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1)"
+  $DEBUGMSG "Hash_salt is $HASH_SALT"
+
+  local LOCAL_SITE_DB="$(echo ${SITE}localdb | sed -e 's/[^a-zA-Z0-9]//g')"
+  $VERBOSEMSG "Local site database is $LOCAL_SITE_DB"
+
+  $MSG "Create settings.local.php"
+
+cat << __EOF__ > "$LOCAL_ROOT/sites/default/settings.local.php"
+<?php
+
+\$config['system.site']['name'] = 'Local $SITE site';
+
+\$settings['hash_salt'] = '$HASH_SALT';
+
+\$databases['default']['default'] = array (
+  'database' => '${LOCAL_SITE_DB}',
+  'username' => '$MYSQL_USER',
+  'password' => '$MYSQL_PASSWORD',
+  'prefix' => '',
+  'host' => 'localhost',
+  'port' => '',
+  'namespace' => 'Drupal\\Core\\Database\\Driver\\mysql',
+  'driver' => 'mysql',
+);
+
+\$config_directories = array(
+  CONFIG_ACTIVE_DIRECTORY => 'sites/default/files/config/active',
+  CONFIG_STAGING_DIRECTORY => 'sites/default/config',
+);
+__EOF__
+
+    # Create the local database at the same time that we
+    # set up the settings.php file.
+    $MSG Create database for local copy of $LOCAL_SITE_ALIAS
+    drush $LOCAL_SITE_ALIAS sql-create
+    COPY_DATABASE=true
+
+  fi
+  check "Created a local settings file for the copy of the site '$SITE'" "Could not create settings.local.php file."
 }
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -478,12 +587,10 @@ fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
-#  M A K E   A   " W O R K I N G   C O P Y "   O F   A   D R U P A L   S I T E
+#  C L O N E   A   P A N T H E O N    D R U P A L   S I T E
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-#
-# Pantheon case:
 #
 # Clone from Pantheon to local.
 #
@@ -528,16 +635,10 @@ then
   REPO="ssh://codeserver.dev.$UUID@codeserver.dev.$UUID.drush.in:2222/~/repository.git"
   $DEBUGMSG "Repository is $REPO"
 
-  HASH_SALT="$(base64 /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1)"
-  $DEBUGMSG "Hash_salt is $HASH_SALT"
-
   LOCAL_ROOT="$BASE_DIR/$PANTHEON_SITE"
   $VERBOSEMSG "Local root is $LOCAL_ROOT"
 
   LOCAL_SITE_ALIAS="@local.$PANTHEON_SITE"
-  $VERBOSEMSG "Local site alias is $LOCAL_SITE_ALIAS"
-
-  LOCAL_SITE_DB="$(echo ${PANTHEON_SITE}localdb | sed -e 's/[^a-zA-Z0-9]//g')"
   $VERBOSEMSG "Local site alias is $LOCAL_SITE_ALIAS"
 
   PANTHEON_SITE_ALIAS="@pantheon.$PANTHEON_SITE.dev"
@@ -561,86 +662,18 @@ then
 
   # 3. Check out the code for the Pantheon site.
 
-  # If the site was already cloned, just update it.
-  if [ -d "$LOCAL_ROOT" ]
-  then
-    $MSG "Update code from git repository"
-    cd "$LOCAL_ROOT"
-    git pull origin master
-    aborterr "Could not pull the master branch from the git remote origin."
-  else
-    $MSG "Making a shallow clone of the git repository"
-    # Make sure that the parent directory of $LOCAL_ROOT exists
-    mkdir -p "$(dirname $LOCAL_ROOT)"
-    cd "$(dirname $LOCAL_ROOT)"
-    git clone --depth 1 "$REPO" $(basename $LOCAL_ROOT)
-    check "Cloned the git repository for the site '$PANTHEON_SITE'" "Could not clone the git repository '$REPO' to $LOCAL_ROOT"
-    cd "$LOCAL_ROOT"
-  fi
+  clone_repository "$PANTHEON_SITE" "$REPO" "$LOCAL_ROOT"
+
+  cd "$LOCAL_ROOT"
 
   # 4. Set up your .gitignore file
 
-  if [ ! -f "$LOCAL_ROOT/.gitignore" ]
-  then
-    $MSG "Set up .gitignore file"
-    cp "$LOCAL_ROOT/example.gitignore" "$LOCAL_ROOT/.gitignore"
-    git add "$LOCAL_ROOT/.gitignore"
-    git commit -m "Create .gitignore file."
-    aborterr "Could not create .gitignore file."
-  fi
+  create_gitignore "$LOCAL_ROOT"
 
   # 5. Configure your settings.php file
-
-  grep -q settings.local.php "$LOCAL_ROOT/sites/default/settings.php"
-  if [ "$?" != "0" ] ; then
-    $MSG "Include settings.local.php from settings.php"
-    echo 'if (file_exists(__DIR__ . "/settings.local.php")) { include __DIR__ . "/settings.local.php"; }' >> sites/default/settings.php
-    git add sites/default/settings.php
-    git commit -m "Add an include local settings line in settings.php"
-    aborterr "Could not add an include for settings.local.php to settings.php."
-    git push
-    check "Could not push modified settings.php back to the central git repository."
-  fi
-
   # 6. Define local configuration values in your settings.local.php file
 
-  if [ ! -f "sites/default/settings.local.php" ]
-  then
-
-  $MSG "Create settings.local.php"
-
-cat << __EOF__ > sites/default/settings.local.php
-<?php
-
-\$config['system.site']['name'] = 'Local $PANTHEON_SITE site';
-
-\$settings['hash_salt'] = '$HASH_SALT';
-
-\$databases['default']['default'] = array (
-  'database' => '${LOCAL_SITE_DB}',
-  'username' => '$MYSQL_USER',
-  'password' => '$MYSQL_PASSWORD',
-  'prefix' => '',
-  'host' => 'localhost',
-  'port' => '',
-  'namespace' => 'Drupal\\Core\\Database\\Driver\\mysql',
-  'driver' => 'mysql',
-);
-
-\$config_directories = array(
-  CONFIG_ACTIVE_DIRECTORY => 'sites/default/files/config/active',
-  CONFIG_STAGING_DIRECTORY => 'sites/default/config',
-);
-__EOF__
-
-    # Create the local database at the same time that we
-    # set up the settings.php file.
-    $MSG Create database for $LOCAL_SITE_ALIAS
-    drush $LOCAL_SITE_ALIAS sql-create
-    COPY_DATABASE=true
-
-  fi
-  check "Created a local settings file for the copy of the site '$PANTHEON_SITE'" "Could not create settings.local.php file."
+  configure_settings_php "$PANTHEON_SITE" "$LOCAL_ROOT"
 
   # 7. Copy the database from Pantheon to the local site
 
@@ -653,6 +686,8 @@ __EOF__
     drush sql-sync $PANTHEON_SITE_ALIAS $LOCAL_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
     check "Copied the database of the site '$PANTHEON_SITE'" "Drush sql-sync failed."
   fi
+
+  # 8. Export the configuration files if they have never been exported before.
 
   # If we have never used the configuration tools before, then
   # our configuration staging directory will be empty.  In that
@@ -681,13 +716,6 @@ __EOF__
     aborterr "Could not import the configuration files to $LOCAL_SITE_ALIAS."
   fi
 
-#
-# Non-Pantheon (local-to-local) case:
-#
-# Clone the site created above to another local site.
-#
-else
-  $DEBUGMSG "Local-to-local Drupal site clone tbd."
 fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
