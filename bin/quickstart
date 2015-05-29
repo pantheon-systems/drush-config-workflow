@@ -553,7 +553,7 @@ then
   # 1. Make sure that your Pantheon Aliases are up-to-date:
 
   terminus sites aliases
-  check "Updated Drush aliases" "Could not update Drush aliases using Terminus."
+  check "Updated Drush aliases for Pantheon sites" "Could not update Drush aliases using Terminus."
 
   # 2. Make an alias for your local site.
 
