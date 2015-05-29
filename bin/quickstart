@@ -184,6 +184,16 @@ while [ $# -gt 0 ] ; do
       IMPORT_CONFIGURATION=true
       ;;
 
+    --pantheon)
+      PANTHEON_SITE="$1"
+      shift
+      ;;
+
+    --dir)
+      BASE_DIR="$1"
+      shift
+      ;;
+
     --env)
       SITE_ENV="$1"
       shift
