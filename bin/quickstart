@@ -49,14 +49,31 @@ VERBOSEMSG=false
 MSG='echo # '
 ERROR='echo '
 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  L O C A L   S C R I P T   F U N C T I O N S
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-# Keep track of things the script did
+#
+# Keep track of things the script did.
+#
+# Usage:
+#
+#   accomplished "Something the script did"
+#
 declare -a ACCOMPLISHMENTS
 function accomplished() {
   ACCOMPLISHMENTS=("${ACCOMPLISHMENTS[@]}" "$1")
 }
 
-# Exit if the previous function returns an error
+#
+# Exit with a message if the previous function returned an error.
+#
+# Usage:
+#
+#   aborterr "Description of what went wrong"
+#
 function aborterr() {
   if [ $? != 0 ]
   then
@@ -65,17 +82,59 @@ function aborterr() {
   fi
 }
 
+#
 # Check the result of the last operation, and either call accomplished or aborterr
+#
+# Usage:
+#
+#   check "Something the script did" "Message to display if it did not work"
+#
 function check() {
   aborterr "$2"
   accomplished "$1"
 }
 
-
-
 #
-# Parse command line args
+# Create a local alias for the specified site in ~/.drush/local.aliases.drushrc.php
 #
+# Usage:
+#
+#   create_local_alias "ALIASNAME" /path/to/root uri
+#
+function create_local_alias() {
+  SITE="$1"
+  ROOT="$2"
+  URI="$3"
+
+  # Create the local.aliases.drushrc.php file if it does not already exist.
+  LOCAL_ALIAS_FILE="$HOME/.drush/local.aliases.drushrc.php"
+  if [ ! -f  "$LOCAL_ALIAS_FILE" ]
+  then
+    echo "<?php" > "$LOCAL_ALIAS_FILE"
+  fi
+
+  # Only add an alias if there isn't already an entry for it in the file.
+  grep -q "aliases\[\"$SITE\"\]" "$LOCAL_ALIAS_FILE"
+  if [ "$?" != "0" ] ; then
+
+    # Append our alias to the end of our local aliases file.
+    cat << __EOF__ >> "$LOCAL_ALIAS_FILE"
+
+\$aliases["$SITE"] = array(
+  'root' => '$ROOT',
+  'uri' => '$URI',
+);
+__EOF__
+  check "Created an alias for '$SITE'" "Could not create an alias for '$SITE' in '$LOCAL_ALIAS_FILE'."
+  fi
+}
+
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+#
+#  P A R S E   C O M M A N D   L I N E   A R G S   A N D   O P T I O N S
+#
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 while [ $# -gt 0 ] ; do
 
   option="$1"
@@ -190,7 +249,7 @@ fi
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #
-#  O . S .  -  S P E C I F I C
+#  O . S .  -  S P E C I F I C   A C T I O N S
 #
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -488,27 +547,7 @@ then
 
   # 2. Make an alias for your local site.
 
-  # Create the local.aliases.drushrc.php file if it does not already exist.
-  LOCAL_ALIAS_FILE="$HOME/.drush/local.aliases.drushrc.php"
-  if [ ! -f  "$LOCAL_ALIAS_FILE" ]
-  then
-    echo "<?php" > "$LOCAL_ALIAS_FILE"
-  fi
-
-  # Only add an alias if there isn't already an entry for it in the file.
-  grep -q "aliases\[\"$PANTHEON_SITE\"\]" "$LOCAL_ALIAS_FILE"
-  if [ "$?" != "0" ] ; then
-
-    # Append our alias to the end of our local aliases file.
-    cat << __EOF__ >> "$LOCAL_ALIAS_FILE"
-
-\$aliases["$PANTHEON_SITE"] = array(
-  'root' => '$LOCAL_ROOT',
-  'uri' => 'localhost:$PORT',
-);
-__EOF__
-  check "Created an alias for '$PANTHEON_SITE'" "Could not create an alias for '$PANTHEON_SITE' in '$LOCAL_ALIAS_FILE'."
-  fi
+  create_local_alias "$PANTHEON_SITE" "$LOCAL_ROOT" "localhost:$PORT"
 
   # 3. Check out the code for the Pantheon site.
 
