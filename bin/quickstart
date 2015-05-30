@@ -158,8 +158,16 @@ __EOF__
 #
 function clone_repository() {
   local SITE="$1"
-  local ROOT="$REPO"
+  local REPO="$2"
   local LOCAL_ROOT="$3"
+
+  DEPTH_MSG=
+  DEPTH_ARG=
+  echo "$REPO" | grep -q '://'
+  if [ "$?" == "0" ] ; then
+    DEPTH_MSG=" shallow"
+    DEPTH_ARG="--depth 1"
+  fi
 
   # If the site was already cloned, just update it.
   if [ -d "$LOCAL_ROOT" ]
@@ -168,11 +176,11 @@ function clone_repository() {
     git pull origin master
     aborterr "Could not pull the master branch from the git remote origin."
   else
-    $MSG "Making a shallow clone of the git repository"
+    $MSG "Making a$DEPTH_MSG clone of the git repository $REPO"
     # Make sure that the parent directory of $LOCAL_ROOT exists
     mkdir -p "$(dirname $LOCAL_ROOT)"
     cd "$(dirname $LOCAL_ROOT)"
-    git clone --depth 1 "$REPO" $(basename $LOCAL_ROOT)
+    git clone $DEPTH_ARG "$REPO" $(basename $LOCAL_ROOT)
     check "Cloned the git repository for the site '$SITE'" "Could not clone the git repository '$REPO' to $LOCAL_ROOT"
   fi
 }
@@ -191,16 +199,36 @@ function create_gitignore() {
   then
     $MSG "Set up .gitignore file"
     cp "$LOCAL_ROOT/example.gitignore" "$LOCAL_ROOT/.gitignore"
-    git add "$LOCAL_ROOT/.gitignore"
-    git commit -m "Create .gitignore file."
     aborterr "Could not create .gitignore file."
+
+    # If there is already a git repository here, then commit the
+    # .gitignore file.  Otherwise, we presume it will become part
+    # of the initial commit.
+    if [ -d "$LOCAL_ROOT/.git" ]
+    then
+      git add "$LOCAL_ROOT/.gitignore"
+      git commit -m "Create .gitignore file."
+      aborterr "Could not commit .gitignore file."
+
+    else
+      # Ignore the drushrc.php file created by drush qd
+      if [ -f "$LOCAL_ROOT/drush/drushrc.php" ]
+      then
+        echo "drush/drushrc.php" >> "$LOCAL_ROOT/.gitignore"
+      fi
+    fi
   fi
 }
 
 function configure_settings_php() {
   local SITE="$1"
   local LOCAL_ROOT="$2"
-  local LOCAL_SITE_ALIAS="@local.$SITE"
+  local LOCAL_SITE_ALIAS="$3"
+
+  if [ -z "$LOCAL_SITE_ALIAS" ]
+  then
+    LOCAL_SITE_ALIAS="@local.$SITE"
+  fi
 
   grep -q settings.local.php "$LOCAL_ROOT/sites/default/settings.php"
   if [ "$?" != "0" ] ; then
@@ -618,7 +646,7 @@ then
   TEST_SITE_ALIAS="@$LOCAL_TEST"
   $VERBOSEMSG "Test site alias is $TEST_SITE_ALIAS"
 
-  DEV_PORT=6666
+  DEV_PORT=9966
   TEST_PORT=9999
 
   # 1. Make an alias for both local sites.
@@ -626,26 +654,33 @@ then
   create_local_alias "$LOCAL_DEV" "$LOCAL_DEV_ROOT" "localhost:$DEV_PORT"
   create_local_alias "$LOCAL_TEST" "$LOCAL_TEST_ROOT" "localhost:$TEST_PORT"
 
-  # 2. Create a Drupal 8 test site with drush qd
+  # Install a Drupal 8 test site with drush core-quick-drupal
 
   if [ ! -d "$LOCAL_TEST_ROOT" ]
   then
 
-    local TEST_SITE_DB="$(echo ${SITE}testdb | sed -e 's/[^a-zA-Z0-9]//g')"
+    $MSG "Create a test site $TEST_SITE_ALIAS with drush core-quick-drupal"
+
+    TEST_SITE_DB="$(echo ${LOCAL_SITES_BASENAME}testdb | sed -e 's/[^a-zA-Z0-9]//g')"
     $VERBOSEMSG "Test site database is $TEST_SITE_DB"
 
     cd "$(dirname $LOCAL_TEST_ROOT)"
     rm -rf "$(basename $LOCAL_TEST_ROOT)" # If there is already an old site here
-    drush qd --core=drupal-8.0.x --db-url="mysql://$MYSQL_USER:$MYSQL_PASSWORD@localhost/$TEST_SITE_DB" "$(basename $LOCAL_TEST_ROOT)" --no-server
+    PW=
+    if [ -n "$MYSQL_PASSWORD" ]
+    then
+      PW=":$MYSQLPASSWORD"
+    fi
+    $MSG drush $TEST_SITE_ALIAS core-quick-drupal --core=drupal-8.0.x --db-url="mysql://$MYSQL_USER$PW@localhost/$TEST_SITE_DB" "$(basename $LOCAL_TEST_ROOT)" --no-server --browser=0
+    drush $TEST_SITE_ALIAS core-quick-drupal --core=drupal-8.0.x --db-url="mysql://$MYSQL_USER$PW@localhost/$TEST_SITE_DB" "$(basename $LOCAL_TEST_ROOT)" --no-server --browser=0
     check "Created a new local 'test' Drupal site $TEST_SITE_ALIAS" "Could not create $TEST_SITE_ALIAS using drush qd"
   fi
 
-  # 3. Create a .gitignore file for the test site
+  # 3. Touch up the configuration directories in settings.php and export configuration
 
-  create_gitignore "$LOCAL_TEST_ROOT"
+  $MSG "Adjust config directories in settings.php file for test site."
 
-  # 4. Touch up the configuration directories in settings.php and export configuration
-
+  chmod +w "$LOCAL_TEST_ROOT/sites/default"
   chmod +w "$LOCAL_TEST_ROOT/sites/default/settings.php"
   cat << __EOF__ >> "$LOCAL_TEST_ROOT/sites/default/settings.php"
 
@@ -653,21 +688,39 @@ then
 \$config_directories['staging'] = 'sites/default/config/staging';
 __EOF__
 
+  mkdir -p "$LOCAL_TEST_ROOT/sites/default/files/config/active"
+  aborterr "Could not create the active configuration directory for the test site."
+  mkdir -p "$LOCAL_TEST_ROOT/sites/default/config/staging"
+  aborterr "Could not create the staging configuration directory for the test site."
+
+  $MSG "Export the configuration for the test site."
   drush $TEST_SITE_ALIAS config-export
+  aborterr "Could not export the initial configuration from the test site."
+
+  # 4. Create a .gitignore file for the test site
+
+  create_gitignore "$LOCAL_TEST_ROOT"
 
   # 5. Make a git repository for the test site
 
+  $MSG "Create a git repository for the test site."
+
   cd "$LOCAL_TEST_ROOT"
-  git init
-  git add .
-  git commit -m "Initial commit"
+  git init > /dev/null 2>&1
+  aborterr "Could not init the git repository at $LOCAL_TEST_ROOT"
+  git add . > /dev/null 2>&1
+  aborterr "Could not add the initial set of files to the git repository at $LOCAL_TEST_ROOT"
+  git commit -m "Initial commit" > /dev/null 2>&1
   check "Created a git repository for the test site" "Could not create a git repository for the test site."
 
   # 6. Set up a bare repository to serve as the central repository for both sites
 
+  $MSG "Create a central git repository to use with the dev and test sites."
+
   GIT_BASE_DIR="$HOME/local/git"
   GIT_DIR="$GIT_BASE_DIR/${LOCAL_SITES_BASENAME}.git"
 
+  rm -rf "$GIT_DIR"
   mkdir -p "$GIT_DIR"
   aborterr "Could not create $GIT_DIR"
   cd "$GIT_DIR"
@@ -677,7 +730,7 @@ __EOF__
   git remote add origin "$GIT_DIR"
   aborterr "Could not add $GIT_DIR as an origin at $LOCAL_TEST_ROOT"
   git push origin master
-  git check "Created a central git repository for the dev and test sites" "Could not push to the central repository at $GIT_DIR"
+  check "Created a central git repository for the dev and test sites" "Could not push to the central repository at $GIT_DIR"
 
   # 7. Check out the code from the repository again for the local "dev" site
 
@@ -686,20 +739,47 @@ __EOF__
   cd "$LOCAL_DEV_ROOT"
 
   # 8. Configure your settings.php file
-  # 9. Define local configuration values in your settings.local.php file
 
-  configure_settings_php "$LOCAL_SITES_BASENAME" "$LOCAL_DEV_ROOT"
+  DEV_SITE_DB="$(echo ${LOCAL_SITES_BASENAME}devdb | sed -e 's/[^a-zA-Z0-9]//g')"
+  $VERBOSEMSG "Dev site database is $DEV_SITE_DB"
 
-  # 10. Copy the database from Pantheon to the local site
+  if [ ! -f "$LOCAL_DEV_ROOT/sites/default/settings.php" ]
+  then
+    cp "$LOCAL_TEST_ROOT/sites/default/settings.php" "$LOCAL_DEV_ROOT/sites/default/settings.php"
+  fi
+
+  grep -q "$DEV_SITE_DB" "$LOCAL_DEV_ROOT/sites/default/settings.php"
+  if [ "$?" != "0" ]
+  then
+
+    cat << __EOF__ >> "$LOCAL_DEV_ROOT/sites/default/settings.php"
+
+    \$config['system.site']['name'] = 'Local $LOCAL_SITES_BASENAME site';
+
+    \$databases['default']['default'] = array (
+      'database' => '${DEV_SITE_DB}',
+      'username' => '$MYSQL_USER',
+      'password' => '$MYSQL_PASSWORD',
+      'prefix' => '',
+      'host' => 'localhost',
+      'port' => '',
+      'namespace' => 'Drupal\\Core\\Database\\Driver\\mysql',
+      'driver' => 'mysql',
+    );
+__EOF__
+
+    $MSG Create database for dev copy of $LOCAL_SITES_BASENAME
+    drush $DEV_SITE_ALIAS sql-create
+    COPY_DATABASE=true
+  fi
+
+  # 9. Copy the database from Pantheon to the local site
 
   if $COPY_DATABASE
   then
-    SQL_DUMP="/tmp/$LOCAL_SITES_BASENAME.sql"
-    SQL_DUMP_GZ="/tmp/$LOCAL_SITES_BASENAME.sql.gz"
-    rm -f "$SQL_DUMP" "$SQL_DUMP_GZ"
     $MSG "drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS"
-    drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
-    check "Copied the database of the site '$LOCAL_SITES_BASENAME'" "Drush sql-sync failed."
+    drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS
+    check "Copied the database of $TEST_SITE_ALIAS to $DEV_SITE_ALIAS" "Drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS failed."
   fi
 fi
 
@@ -878,7 +958,7 @@ then
   then
 
     echo "Next, open your Pantheon dashboard in another browser window, and"
-    echo "visit the development site for $PATHEON_SITE."
+    echo "visit the development site for $PANTHEON_SITE."
 
   else
 
@@ -900,7 +980,7 @@ then
   echo "and move the search block to the header region on the other site"
   echo "using the command above.  When config-merge completes, you should"
   echo "find that the local site has both the new site slogan, and the"
-  echo "search block should be in the header.  The Pantheon site won't"
+  echo "search block should be in the header.  The test site won't"
   echo "get the updated configuration changes until you deploy them."
   echo
 
