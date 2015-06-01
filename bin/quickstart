@@ -649,12 +649,14 @@ then
   DEV_PORT=9966
   TEST_PORT=9999
 
+
   # 1. Make an alias for both local sites.
 
   create_local_alias "$LOCAL_DEV" "$LOCAL_DEV_ROOT" "localhost:$DEV_PORT"
   create_local_alias "$LOCAL_TEST" "$LOCAL_TEST_ROOT" "localhost:$TEST_PORT"
 
   # Install a Drupal 8 test site with drush core-quick-drupal
+  # (We do this in a different order than in the README so that we can use the alias we created above with the qd command)
 
   if [ ! -d "$LOCAL_TEST_ROOT" ]
   then
@@ -676,32 +678,39 @@ then
     check "Created a new local 'test' Drupal site $TEST_SITE_ALIAS" "Could not create $TEST_SITE_ALIAS using drush qd"
   fi
 
-  # 3. Touch up the configuration directories in settings.php and export configuration
+  # 2. Touch up the configuration directories in settings.php and export configuration
 
-  $MSG "Adjust config directories in settings.php file for test site."
+  CONFIG_RANDOM="$(base64 /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1)"
 
-  chmod +w "$LOCAL_TEST_ROOT/sites/default"
-  chmod +w "$LOCAL_TEST_ROOT/sites/default/settings.php"
-  cat << __EOF__ >> "$LOCAL_TEST_ROOT/sites/default/settings.php"
+  grep -q "sites/default/config_" "$LOCAL_TEST_ROOT/sites/default/settings.php"
+  if [ "$?" != "0" ]
+  then
 
-\$config_directories['active'] = 'sites/default/files/config/active';
-\$config_directories['staging'] = 'sites/default/config/staging';
+    $MSG "Adjust config directories in settings.php file for test site."
+
+    chmod +w "$LOCAL_TEST_ROOT/sites/default"
+    chmod +w "$LOCAL_TEST_ROOT/sites/default/settings.php"
+    cat << __EOF__ >> "$LOCAL_TEST_ROOT/sites/default/settings.php"
+
+  \$config_directories['active'] = 'sites/default/files/config_$CONFIG_RANDOM/active';
+  \$config_directories['staging'] = 'sites/default/config_$CONFIG_RANDOM/staging';
 __EOF__
 
-  mkdir -p "$LOCAL_TEST_ROOT/sites/default/files/config/active"
-  aborterr "Could not create the active configuration directory for the test site."
-  mkdir -p "$LOCAL_TEST_ROOT/sites/default/config/staging"
-  aborterr "Could not create the staging configuration directory for the test site."
+    mkdir -p "$LOCAL_TEST_ROOT/sites/default/files/config_$CONFIG_RANDOM/active"
+    aborterr "Could not create the active configuration directory for the test site."
+    mkdir -p "$LOCAL_TEST_ROOT/sites/default/config_$CONFIG_RANDOM/staging"
+    aborterr "Could not create the staging configuration directory for the test site."
 
-  $MSG "Export the configuration for the test site."
-  drush $TEST_SITE_ALIAS config-export
-  aborterr "Could not export the initial configuration from the test site."
+    $MSG "Export the configuration for the test site."
+    drush $TEST_SITE_ALIAS config-export
+    aborterr "Could not export the initial configuration from the test site."
+  fi
 
-  # 4. Create a .gitignore file for the test site
+  # 3. Create a .gitignore file for the test site
 
   create_gitignore "$LOCAL_TEST_ROOT"
 
-  # 5. Make a git repository for the test site
+  # 4. Make a git repository for the test site
 
   $MSG "Create a git repository for the test site."
 
@@ -713,7 +722,7 @@ __EOF__
   git commit -m "Initial commit" > /dev/null 2>&1
   check "Created a git repository for the test site" "Could not create a git repository for the test site."
 
-  # 6. Set up a bare repository to serve as the central repository for both sites
+  # 5. Set up a bare repository to serve as the central repository for both sites
 
   $MSG "Create a central git repository to use with the dev and test sites."
 
@@ -732,13 +741,13 @@ __EOF__
   git push origin master
   check "Created a central git repository for the dev and test sites" "Could not push to the central repository at $GIT_DIR"
 
-  # 7. Check out the code from the repository again for the local "dev" site
+  # 6. Check out the code from the repository again for the local "dev" site
 
   clone_repository "$LOCAL_SITES_BASENAME" "$GIT_DIR" "$LOCAL_DEV_ROOT"
 
   cd "$LOCAL_DEV_ROOT"
 
-  # 8. Configure your settings.php file
+  # 7. Configure your settings.php file
 
   DEV_SITE_DB="$(echo ${LOCAL_SITES_BASENAME}devdb | sed -e 's/[^a-zA-Z0-9]//g')"
   $VERBOSEMSG "Dev site database is $DEV_SITE_DB"
@@ -770,10 +779,11 @@ __EOF__
 
     $MSG Create database for dev copy of $LOCAL_SITES_BASENAME
     drush $DEV_SITE_ALIAS sql-create
+    aborterr
     COPY_DATABASE=true
   fi
 
-  # 9. Copy the database from Pantheon to the local site
+  # 8. Copy the database from "test" site to the "dev" site
 
   if $COPY_DATABASE
   then
@@ -977,7 +987,8 @@ then
   echo "    drush $DEV_SITE_ALIAS config-merge $TEST_SITE_ALIAS"
   echo
   echo "As an experiment, try changing the site slogan on the local site,"
-  echo "and move the search block to the header region on the other site"
+  echo "and move the search block to the header region on the other site."
+  echo "Then, merge the configuration changes from both sites together"
   echo "using the command above.  When config-merge completes, you should"
   echo "find that the local site has both the new site slogan, and the"
   echo "search block should be in the header.  The test site won't"
