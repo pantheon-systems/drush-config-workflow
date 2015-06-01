@@ -242,4 +242,4 @@ drush @pantheon.sitename.dev config-import
 ```
 Be aware that deploying like this will overwrite all of the configuration on the target site, so be sure to run config-merge first, so that you can insure that all of the remote configuration changes will be preserved.
 
-For more information on how the configuration merge workflow works, see the [rsync workflow](rsync_workflow.md) (for local sites cloned from a Pantheon site) or the [git workflow](git_workflow.md) pages.
+For more information on how the configuration merge workflow works, see the [rsync workflow](rsync_workflow.md) (for local sites cloned from a Pantheon site) or the [git workflow](git_workflow.md) page (if you created two local sites).
