@@ -92,7 +92,7 @@ At the root of your test site, set up a repository:
 git init
 git add .
 git commit -m "Initial commit."
-
+```
 5. Set up a central repository
 
 If you do not already have a central repository available on a server, you can set one up on your local machine, just to use for testing `config-merge` in a simulated environment.
@@ -106,9 +106,9 @@ git push origin master
 ```
 
 6. Clone the "test" Drupal site to a "dev" Drupal site
-
+```
 git clone /path/to/git/repo /path/to/dev/drupal/site
-
+```
 7. Configure your "dev" site's settings.php file
 
 Edit the "Databases" record in your dev site's .settings.php file and give the dev site its own local database.  Make sure that you create the sql database (e.g. via `drush sql-create`).
