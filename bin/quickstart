@@ -790,6 +790,7 @@ __EOF__
     $MSG "drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS"
     drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS
     check "Copied the database of $TEST_SITE_ALIAS to $DEV_SITE_ALIAS" "Drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS failed."
+    drush $DEV_SITE_ALIAS cr
   fi
 fi
 
@@ -893,6 +894,7 @@ then
     $MSG "drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS"
     drush sql-sync $TEST_SITE_ALIAS $DEV_SITE_ALIAS --target-dump="$SQL_DUMP_GZ"
     check "Copied the database of the site '$PANTHEON_SITE'" "Drush sql-sync failed."
+    drush $DEV_SITE_ALIAS cr
   fi
 
   # 8. Export the configuration files if they have never been exported before.
