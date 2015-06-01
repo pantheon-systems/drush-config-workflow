@@ -54,7 +54,7 @@ If you created a Drupal 8 site with `drush quick-drupal`, follow the instuctions
 
 Reminder:  You can just run `./bin/quickstart --create-local-sites sitename`, and it will do all of the steps described below for you.
 
-1. Make an alias for both of your sites.
+i. Make an alias for both of your sites.
 
 Create a file ~/.drush/local.aliases.drushrc.php, and add the following entry:
 ```
@@ -69,7 +69,7 @@ $aliases["sitename.test"] = array(
 ```
 Change `sitename.dev` and `sitename.test` to match the name of your site, and adjust the path to the site and the port number in the URI to suit your preferences.
 
-2. Decide where you want to put your configuration directories:
+ii. Decide where you want to put your configuration directories:
 
 Drupal 8 defaults to storing configuration exports inside the `files` directory.  If you use the example.gitignore file that Drupal 8 also provides, then the `files` directory is not committed to the git repository.  We definitely want our configuration to be under git version control, so that we can use git's three-way-merge facilities.
 
@@ -79,13 +79,13 @@ Add something like the following to your settings.php file:
 \$config_directories['staging'] = 'sites/default/config_RANDOMSTRING/staging';
 ```
 
-3. Set up your .gitignore file
+iii. Set up your .gitignore file
 
 Copy Drupal's example.gitignore file to .gitignore, and commit it to the repository.
 
 If you do not want to change the location of your configuration files as shown in the previous step, you could instead adjust the contents of your .gitignore file to include the configuration directory in the repository.
 
-4. Set up a git repository for the test site
+iv. Set up a git repository for the test site
 
 At the root of your test site, set up a repository:
 ```
@@ -93,7 +93,7 @@ git init
 git add .
 git commit -m "Initial commit."
 ```
-5. Set up a central repository
+v. Set up a central repository
 
 If you do not already have a central repository available on a server, you can set one up on your local machine, just to use for testing `config-merge` in a simulated environment.
 ```
@@ -105,11 +105,11 @@ git remote add origin /path/to/git/repo
 git push origin master
 ```
 
-6. Clone the "test" Drupal site to a "dev" Drupal site
+vi. Clone the "test" Drupal site to a "dev" Drupal site
 ```
 git clone /path/to/git/repo /path/to/dev/drupal/site
 ```
-7. Configure your "dev" site's settings.php file
+vii. Configure your "dev" site's settings.php file
 
 Edit the "Databases" record in your dev site's .settings.php file and give the dev site its own local database.  Make sure that you create the sql database (e.g. via `drush sql-create`).
 
@@ -118,7 +118,7 @@ You might also wish to set the site name in settings so that you can tell the di
 $config['system.site']['name'] = 'Local sitename'
 ```
 
-8. Copy the "test" site's dateabase to the "dev" site database
+viii. Copy the "test" site's dateabase to the "dev" site database
 ```
 drush sql-sync @sitename.test @sitename.dev
 ```
@@ -129,7 +129,7 @@ If you created a Drupal 8 site on Pantheon, follow the instructions in this sect
 
 Reminder:  You can just run `./bin/quickstart pantheon-sitename`, and it will do all of the steps described below for you.
 
-1. Make sure that your Pantheon Aliases are up-to-date:
+i. Make sure that your Pantheon Aliases are up-to-date:
 
 Use Terminus to download a copy of your aliases.
 ```
@@ -139,7 +139,7 @@ This will create the file ~/.drush/pantheon.aliases.drushrc.php; you can overrid
 
 n.b. You will need to log in via `terminus auth login` first.
 
-2. Make an alias for your local site.
+ii. Make an alias for your local site.
 
 Create a file ~/.drush/local.aliases.drushrc.php, and add the following entry:
 ```
@@ -150,7 +150,7 @@ $aliases["pantheon-sitename"] = array(
 ```
 Change `pantheon-sitename` to match the name of your site, and adjust the path to the site and the port number in the URI to suit your preferences.
 
-3. Check out the code for the Pantheon site.
+iii. Check out the code for the Pantheon site.
 
 Look up your repository's URL on the Pantheon dashboard, or use Terminus to look up the site's UUID:
 ```
@@ -160,12 +160,11 @@ Make sure that the parent directory exists (i.e., `mkdir /Users/username/local/d
 ```
 $ git clone ssh://codeserver.dev.$UUID@codeserver.dev.$UUID.drush.in:2222/~/repository.git pantheon-sitename
 ```
-
-4. Set up your .gitignore file
+iv. Set up your .gitignore file
 
 If you haven't already done so, copy Drupal's example.gitignore file to .gitignore, and commit it to the repository.
 
-5. Configure your settings.php file
+v. Configure your settings.php file
 
 Add a line at the bottom of your settings.php file, and commit it:
 
@@ -175,7 +174,7 @@ if (file_exists(__DIR__ . "/settings.local.php")) {
 }
 ```
 
-6. Define local configuration values in your settings.local.php file
+vi. Define local configuration values in your settings.local.php file
 
 Add local configuration similar to the example shown below, customized for your environment:
 ```
@@ -201,7 +200,7 @@ The value of the hash salt is not very important if the site will only be used f
 $ cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1
 ```
 
-7. Copy the database from Pantheon to the local site
+vii. Copy the database from Pantheon to the local site
 
 ```
 $ drush @local.pantheon-sitename sql-create
@@ -212,7 +211,7 @@ Make sure that the alias name you use for the target site matches what you did i
 
 Once you have completed all of these steps, you will be ready to start using the config-merge command, as described in the (README)[README.md].
 
-8. Export the configuration files if they have never been exporte before
+viii. Export the configuration files if they have never been exporte before
 
 Run `drush config-export`, and commit the results back to the git repository.
 
