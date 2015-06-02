@@ -558,6 +558,7 @@ if [ "$?" != "0" ]
   (
     cd "$HOME/.drush"
     composer global require "drush/config-extra"
+    drush cc drush
   )
 fi
 
