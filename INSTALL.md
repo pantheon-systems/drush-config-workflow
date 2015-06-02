@@ -18,6 +18,7 @@ Insure that PHP 5.4 or later, and MYSQL are installed before you begin.
 
 * A config-merge tool, e.g. `kdiff3`, must be installed
 * Drush 8.x-dev
+* Drush config-extra
 * Pantheon Terminus CLI (Optional -- only needed if using a Pantheon remote)
 * Drupal 8.0-beta10 or later
   * A local or remote "testing" or "staging" site
@@ -31,6 +32,10 @@ Insure that PHP 5.4 or later, and MYSQL are installed before you begin.
 
 ## Installing Drush 8
 Follow the [installation instructions in the Drush documentation](http://docs.drush.org/en/master/install/) to install Drush 8.  Most users should be able to upgrade from Drush 5 or Drush 6 to version 8 without encountering any issues.  Currently, only Drupal 8 is supported by the config-merge command.  A Drupal 7 version may be provided in the future.
+
+## Installing Drush config/extra
+
+Follow the [installation instructions in the Drush config-extra project](https://github.com/drush-ops/config-extra).
 
 ## Installing Terminus CLA
 
