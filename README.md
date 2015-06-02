@@ -1,9 +1,9 @@
 # drush-config-workflow
 Jumpstart your Drupal configuration merge magic with this repo's code and instructions. 
 
-[Git Workflow](docs/git_workflow.md)   | [Rsync Workflow](docs/rsync_workflow.md)
--------------------------------------- | ------------------------------------------
-![git workflow](img/git_workflow.png)  | ![rsync workflow](img/rsync_workflow.png)
+[Git Workflow](docs/git_workflow.md)       | [Rsync Workflow](docs/rsync_workflow.md)
+------------------------------------------ | ----------------------------------------------
+![git workflow](docs/img/git_workflow.png) | ![rsync workflow](docs/img/rsync_workflow.png)
 
 
 ## Overview
