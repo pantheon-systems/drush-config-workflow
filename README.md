@@ -3,7 +3,7 @@ Jumpstart your Drupal configuration merge magic with this repo's code and instru
 
 [Git Workflow](docs/git_workflow.md)       | [Rsync Workflow](docs/rsync_workflow.md)
 ------------------------------------------ | ----------------------------------------------
-![git workflow](docs/img/git_workflow.png) | ![rsync workflow](docs/img/rsync_workflow.png)
+[![git workflow](docs/img/git_workflow.png)](docs/git_workflow.md) | [![rsync workflow](docs/img/rsync_workflow.png)](docs/rsync_workflow.md)
 
 
 ## Overview
