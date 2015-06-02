@@ -1,6 +1,11 @@
 # drush-config-merge
 Jumpstart your Drupal configuration merge magic with this repo's code and instructions. 
 
+[Git Workflow](docs/git_workflow.md)   | [Rsync Workflow](docs/rsync_workflow.md)
+-------------------------------------- | ------------------------------------------
+![git workflow](img/git_workflow.png)  | ![rsync workflow](img/rsync_workflow.png)
+
+
 ## Overview
 The Drush `config-merge` command is a powerful tool to use in your configuration workflow. With this command, you can combine configuration changes made on two Drupal sites.  When the configuration changes are not conflicting, then the merge happens automatically, after a confirmation message listing the sections changed is presented.  If configuration changes _are_ in conflict, then a three-way merge tool will be launched, allowing for the conflicts to be reconciled by hand in the configuration YAML files.
 
