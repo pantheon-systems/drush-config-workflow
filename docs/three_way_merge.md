@@ -12,7 +12,7 @@ A three-way merge is so named because it considers three distinct revisions of e
 
 All three of these revisions are shown together, side-by-side-by-side, and controls are provided to allow the user to select which changes to keep, and which to discard.  The user is also usually supplied with an editable fourth pane, where the final state of the file is shown, post-merge.  In some cases, the final desired state requires that the "ours" and "theirs" revisions be combined or reordered in some way.  In this event, the user may edit the text manually to fill in any gaps that the tool could not derive automatically.
 
-## Simple example -- changing the same configuration item to different values
+## Simple example -- conflicting changes
 
 The canonical example of a conflict is when the same line in the same file is changed in distinctly different ways in the same commit.  This is a true conflict.  There is no way for git to determine which value to select; manual inspection and correction is required.
 
