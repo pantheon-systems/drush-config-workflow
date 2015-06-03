@@ -54,4 +54,4 @@ Pressing the down arrow advances to the next diff, but at this point, it is not 
 
 Alice then saves her changes and closes the kdiff3 window, and tells `config-merge` to commit the change.  After a brief test, she deploys the merged changes back to the staging server, and everything is back in sync again.
 
-The process continues itertively each time there are configuration changes that need to be made.  See the [git workflow](docs/git_workflow.md) and [rsync workflow](docs/rsync_workflow.md) pages for more information on these two configuration workflow methods.
+The process continues itertively each time there are configuration changes that need to be made.  See the [git workflow](git_workflow.md) and [rsync workflow](rsync_workflow.md) pages for more information on these two configuration workflow methods.
