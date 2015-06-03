@@ -22,7 +22,7 @@ Meanwhile, Bob also sees the email and decides that he'll just move the search b
 
 When Alice returns to the office, she reconnects to the Internet and runs `config-merge` to pick up Bob's latest changes.  Oh oh, there's a conflict!
 
-[kdiff3 diagram]
+![Search block conflict](docs/img/kdiff3-search-block-conflict.png)
 
 It is clear to Alice from the diff what happens.  Since she knows that Pat prefers the search block in the header, she selects the change shown in the left panel, and commits it.  The next time her change is deployed to the staging server, the search block will move to the correct region. 
 
@@ -34,6 +34,20 @@ Alice and Bob are both working on features for their site's users.  Bob needs to
 
 The next time Alice runs `config-merge`, she will see a conflict between her change and Bob's.  Even though the fields they added are completely separate, the configuration entries that list which fields are attached to the user entity overlap in these two commits, and git cannot figure out how to combine them.
 
-[kdiff diagram]
+![User field conflicts](docs/img/kdiff3-user-field-conflicts.png)
 
-That's a bit of a mess, but it's actually pretty easy to fix.  Both Alice and Bob's changes added lines to the configuration file that were very similar; in fact, the last [N] lines of each are exactly the same.  Git was confused by this, and thought that only one copy of these lines were intended, but in fact, each change set needs to have these lines.  Alice selects the changes from both the left and right panes, and then uses the editor to copy the missing lines to complete Bob's change.  She then saves her changes and closes the kdiff3 window, and commits the change.  After a brief test, she deploys the merged changes back to the staging server, and everything is back in sync again.
+That's a bit of a mess, but it's actually pretty easy to fix.  Both Alice and Bob's changes added lines to the configuration file that were very similar; in fact, the last [N] lines of each are exactly the same.  Git was confused by this, and thought that only one copy of these lines were intended, but in fact, each change set needs to have these lines.   
+
+After resolving the first set of conflicts, the text looks like this:
+
+![User field configs section resolved](docs/img/kdiff3-user-field-configs-resolved-sm.png)
+
+Next, Alice presses the small single down-arrow to go to the next conflict, and then clicks on both "B" and "C".  The text now looks like this:
+
+![User field resolving conflicts in content section](docs/img/kdiff3-user-field-content-resolving.png)
+
+Pressing the down arrow advances to the next diff, but at this point, it is not possible to resolve the conflict by choosing between "B" and "C", because these sections are identical.  What is needed at this point is another copy of this same block of text, inserted one line higher.  Alice selects all of the lines labeled "C", copies them to the clipboard, and pastes them into the text at the correct location, producing additional lines labeled "m".
+
+![User field resolving conflicts in content section](docs/img/kdiff3-user-field-content-manually-resolved.png)
+
+Alice then saves her changes and closes the kdiff3 window, and commits the change.    After a brief test, she deploys the merged changes back to the staging server, and everything is back in sync again.
