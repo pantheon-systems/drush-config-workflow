@@ -51,11 +51,7 @@ At this point in development, none of Alice or Bob’s changes overlap, so the c
 
 Alice then merges her feature branch back into the master branch as commit (2), but she then discovers that Bob has made more changes to the staging server while she was merging.  If Alice deployed now, his additional changes [c] would be overwritten by the config-import, so Alice waits until he is done, making some additional configuration changes herself while she is waiting.
 
-Alice then runs the config-merge command again, to combine configuration changes [c] and [w].  This time, Alice discovers that she and Bob both changed the same content type.  When config-merge runs git merge, this conflict will be flagged, and a three-way diff tool will be brought up, and Alice will have the opportunity to review and resolve the conflicts.
-
-[kdiff3 diagram--if I am going to show a diff, then I need to have an example of what is being changed for context.]
-
-Once this is done, Alice creates tag <T2> and does another deployment to the staging server, bringing Bob’s environment back into sync with her changes.
+Alice then runs the config-merge command again, to combine configuration changes [c] and [w].  This time, Alice discovers that she and Bob both changed the same content type.  When config-merge runs git merge, this conflict will be flagged, and a three-way diff tool will be brought up.  At this point, Alice will have the opportunity to review and resolve the conflicts.  See the [three-way merge](three_way_merge.md) page for a description of this process.  Once this is done, Alice creates tag <T2> and does another deployment to the staging server, bringing Bob’s environment back into sync with her changes.
 
 Later in the project, Alice receives an email from Bob.  He finished up some work, and wants Alice to try his changes with the code she is working on before they deploy it to the staging server.  Bob assures Alice that his changes worked fine on his machine before he exported and committed them to the git repository.  Alice can once again use the `config-merge` command to pull in his changes.  She types:
 ```
