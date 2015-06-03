@@ -37,3 +37,6 @@ In `rsync mode`, config-merge will first export the currnet configuration change
 
 Please read the [rsync configuration workflow](docs/rsync_workflow.md) for more information on how this works.
 
+## Three-way merge
+
+Whether you are using `git mode` or `rsync mode`, Drush `config-merge` will automatically bring up a three-way merge tool when necessary to resolve conflicts between the merged commits.  See the [Three-way merge](docs/three_way_merge.md) documentation for details on how to use this tool.
