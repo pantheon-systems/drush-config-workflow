@@ -8,9 +8,9 @@ You can quickly get started by running the `quickstart` script:
 ```
 This will install all of the software that you need, and create a local development copy of a Drupal 8 Pantheon site (if the Pantheon site name is provided as a commandline argument), or a pair of local Drupal 8 sites (if --create-local-sites is used).
 
-If you do not want to use the script, you can manually install the necessary components per the instructions below.
+If you do not want to use the script, you can manually install the necessary components as per the instructions below.
 
-## Prerequirements
+## Prerequisites
 
 Insure that PHP 5.4 or later, and MYSQL are installed before you begin.
 
@@ -37,7 +37,7 @@ Follow the [installation instructions in the Drush documentation](http://docs.dr
 
 Follow the [installation instructions in the Drush config-extra project](https://github.com/drush-ops/config-extra).
 
-## Installing Terminus CLA
+## Installing Terminus CLI
 
 Follow the [terminus installation instructions](https://github.com/pantheon-systems/cli/wiki/Installation).
 
@@ -100,7 +100,7 @@ git commit -m "Initial commit."
 ```
 v. Set up a central repository
 
-If you do not already have a central repository available on a server, you can set one up on your local machine, just to use for testing `config-merge` in a simulated environment.
+If you do not already have a central repository available on a server, you can set one up on your local machine; just to use for testing `config-merge` in a simulated environment.
 ```
 mkdir -p /path/to/git/repo
 cd /path/to/git/repo
@@ -123,7 +123,7 @@ You might also wish to set the site name in settings so that you can tell the di
 $config['system.site']['name'] = 'Local sitename'
 ```
 
-viii. Copy the "test" site's dateabase to the "dev" site database
+viii. Copy the "test" site's database to the "dev" site database
 ```
 drush sql-sync @sitename.test @sitename.dev
 ```
@@ -198,7 +198,7 @@ $databases['default']['default'] = array (
   'driver' => 'mysql',
 );
 ```
-The most important items to customize are the Database username, and the database password, which must match the credentials for a local user that has permissions to create and write to local databases.
+The most important items to customize are the database username, and the database password, which must match the credentials for a local user that has permissions to create and write to local databases.
 
 The value of the hash salt is not very important if the site will only be used from the local system.  You can generate a random 75-character hash salt from bash via the following command:
 ```
