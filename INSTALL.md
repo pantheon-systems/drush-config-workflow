@@ -39,7 +39,7 @@ Follow the [installation instructions in the Drush config-extra project](https:/
 
 ## Installing Terminus CLI
 
-Follow the [terminus installation instructions](https://github.com/pantheon-systems/cli/wiki/Installation).
+Follow the [terminus installation instructions](https://github.com/pantheon-systems/cli/blob/master/README.md).
 
 ## Installing Drupal 8
 If you already have a remote Drupal 8 testing site, then you may use it to try out config-merge.  Otherwise, you'll need to make a pair of local sites to work with.  These sites should share the same git repository, and they should have the same site UUID--meaning, that the database of the working site should be a copy of the databse on the first site.
