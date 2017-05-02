@@ -835,7 +835,7 @@ then
   fi
 
   # Check our connection mode
-  CONNECTION_MODE=$(terminus site connection-mode --site="$PANTHEON_SITE" --env="$SITE_ENV")
+  CONNECTION_MODE=$(terminus site connection-info --site="$PANTHEON_SITE" --env="$SITE_ENV")
   aborterr "Could not use terminus to determine the connection mode of the $SITE_ENV environment of the Pantheon site '$PANTHEON_SITE'."
   $DEBUGMSG "$CONNECTION_MODE"
   echo "$CONNECTION_MODE" | grep -qi git
