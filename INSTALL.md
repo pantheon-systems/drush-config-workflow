@@ -159,7 +159,7 @@ iii. Check out the code for the Pantheon site.
 
 Look up your repository's URL on the Pantheon dashboard, or use Terminus to look up the site's UUID:
 ```
-$ UUID=$(terminus site info --site=pantheon-sitename --field=id)
+$ UUID=$(terminus sites --name=pantheon-sitename --field=id)
 ```
 Make sure that the parent directory exists (i.e., `mkdir /Users/username/local/drupal`), then `cd` to it and clone the repository.
 ```
