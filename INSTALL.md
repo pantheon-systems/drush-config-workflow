@@ -138,7 +138,7 @@ i. Make sure that your Pantheon Aliases are up-to-date:
 
 Use Terminus to download a copy of your aliases.
 ```
-$ terminus sites aliases
+$ terminus aliases
 ```
 This will create the file ~/.drush/pantheon.aliases.drushrc.php; you can override this with the --location option, though.
 
