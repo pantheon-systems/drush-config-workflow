@@ -204,6 +204,10 @@ The value of the hash salt is not very important if the site will only be used f
 ```
 $ cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1
 ```
+On a mac:
+```
+$ cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1
+```
 
 vii. Copy the database from Pantheon to the local site
 
