@@ -202,7 +202,7 @@ The most important items to customize are the database username, and the databas
 
 The value of the hash salt is not very important if the site will only be used from the local system.  You can generate a random 75-character hash salt from bash via the following command:
 ```
-$ cat /dev/urandom | env LC_CTYPE=ALL tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1
+$ cat /dev/urandom | env LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 75 | head -n 1
 ```
 
 vii. Copy the database from Pantheon to the local site
